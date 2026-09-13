@@ -1,0 +1,16 @@
+{
+  "name": "clade",
+  "private": true,
+  "type": "module",
+  "description": "Clade. Shared core, tests and build tooling. The Sprint 1 probe keeps its own package in server/.",
+  "scripts": {
+    "test:determinism": "node tests/determinism.test.ts",
+    "test:purity": "bash tests/core-purity.sh core",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

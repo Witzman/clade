@@ -1,0 +1,54 @@
+name: core
+
+# The gates on core/, the rules shared by every variant, the server and the
+# browser. Workshop issues #23, #24.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 strips TypeScript types natively, so the test runs unbuilt,
+      # exactly as the server will run core/.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Bun is JavaScriptCore, the engine family of Safari and of every
+      # browser on an iPad.
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Golden hashes under V8 (Node 22)
+        run: node tests/determinism.test.ts
+
+      - name: Golden hashes under JavaScriptCore (Bun)
+        run: bun tests/determinism.test.ts
+
+  core-purity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No engine-dependent maths, clocks or outside imports in core/
+        run: bash tests/core-purity.sh core
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
