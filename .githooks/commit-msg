@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Rule: every commit is authored by witzman alone.
+#
+# No Co-Authored-By trailer, no "Generated with Claude Code" line. This
+# overrides any assistant harness default. In the sibling project this rule
+# was prose, was broken 32 times, and cost a history rewrite over 46 commits.
+# It gets a door here instead of a sentence.
+set -euo pipefail
+
+msg_file="$1"
+
+if grep -qiE '^\s*Co-Authored-By:' "$msg_file"; then
+    echo "commit-msg: refused -- Co-Authored-By trailer present." >&2
+    echo "            Every commit is authored by witzman alone. See CLAUDE.md." >&2
+    exit 1
+fi
+
+if grep -qiE 'Generated with .*Claude|Claude Code|claude\.com/claude-code|🤖' "$msg_file"; then
+    echo "commit-msg: refused -- assistant attribution present." >&2
+    echo "            Every commit is authored by witzman alone. See CLAUDE.md." >&2
+    exit 1
+fi

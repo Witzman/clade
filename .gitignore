@@ -1,0 +1,14 @@
+# Process documents never enter this repository. They live in the private
+# workshop repo, which this one is cloned inside. Nothing a reader of the
+# published game can see may link to a path they cannot reach.
+notes/
+
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.local
+__pycache__/
+*.pyc

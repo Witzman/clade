@@ -1,0 +1,47 @@
+name: hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No assistant attribution in commit messages
+        run: |
+          # Rule: every commit is authored by witzman alone. This job exists
+          # because in the sibling project the rule was prose, was broken 32
+          # times, and cost a history rewrite over 46 commits.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            range="${{ github.event.before }}..${{ github.sha }}"
+            git rev-parse --quiet --verify "${{ github.event.before }}" >/dev/null || range="HEAD~1..HEAD"
+          fi
+          bad=$(git log --format='%H %s%n%b' "$range" \
+                | grep -inE 'Co-Authored-By:|Generated with .*Claude|claude\.com/claude-code' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::assistant attribution found in commit messages"
+            echo "$bad"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: No internal paths in tracked files
+        run: |
+          # Corollary: nothing a reader of the published game can see may link
+          # to a path they cannot reach.
+          bad=$(git grep -nE '~/game/notes|/home/witzman' -- . \
+                ':!.github/workflows/hygiene.yml' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::internal path referenced in a published file"
+            echo "$bad"
+            exit 1
+          fi
+          echo "clean"
