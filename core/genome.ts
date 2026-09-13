@@ -88,6 +88,3 @@ export function writeAllele(g: Genome, l: number, s: number, f: number, gr: numb
 }
 
 export const clampV = (x: number) => Math.max(-VMAX, Math.min(VMAX, Math.round(x)));
-
-// THROWAWAY: negative control for core-purity (workshop #24). Reverted next commit.
-export const PURITY_PROBE = Math.pow(1.5, 0.75);
