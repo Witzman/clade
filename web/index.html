@@ -2,6 +2,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>game.witzman.de</title>
+<!-- Inline SVG favicon. Without one the browser requests /favicon.ico, gets a
+     404, and every QA run reports a console error that means nothing. A check
+     that cries wolf is one that stops being read. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0d10'/><circle cx='8' cy='8' r='4' fill='%233fb950'/></svg>">
 <style>
   :root { color-scheme: dark; }
   body {
