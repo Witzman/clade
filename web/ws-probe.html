@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ws probe</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:1.5rem; background:#0b0d10; color:#e6e8eb;
+         font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  h1 { font-size:1rem; margin:0 0 1rem; font-weight:600; }
+  #log { white-space:pre-wrap; margin-top:1rem; max-height:60vh; overflow:auto; }
+  .ok { color:#3fb950; } .bad { color:#f85149; } .dim { color:#7d8590; }
+  button { font:inherit; background:#21262d; color:#e6e8eb; border:1px solid #30363d;
+           padding:.4rem .8rem; border-radius:4px; cursor:pointer; margin-right:.4rem; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:.2rem 1rem; margin:0 0 1rem; }
+  dt { color:#7d8590; } dd { margin:0; }
+</style>
+<h1>websocket probe — workshop issue #15</h1>
+<dl>
+  <dt>state</dt><dd id="state" class="dim">idle</dd>
+  <dt>open for</dt><dd id="age" class="dim">—</dd>
+  <dt>round trips</dt><dd id="count">0</dd>
+  <dt>median / p95 / worst</dt><dd id="lat" class="dim">—</dd>
+</dl>
+<button id="start">connect + hold 5 min</button>
+<button id="burst">100 round trips</button>
+<button id="stop">close</button>
+<div id="log"></div>
+<script>
+const $ = id => document.getElementById(id);
+const log = (msg, cls = '') => {
+  const t = new Date().toISOString().slice(11, 23);
+  $('log').insertAdjacentHTML('afterbegin', `<div class="${cls}">${t}  ${msg}</div>`);
+};
+let ws, openedAt, timer, heartbeat, pending = new Map(), lats = [];
+
+const stats = () => {
+  if (!lats.length) return;
+  const s = [...lats].sort((a, b) => a - b);
+  const q = p => s[Math.min(s.length - 1, Math.floor(s.length * p))];
+  $('lat').textContent = `${q(0.5)} / ${q(0.95)} / ${s[s.length - 1]} ms`;
+  $('count').textContent = lats.length;
+};
+
+function connect() {
+  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+  log(`connecting to ${url}`);
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    openedAt = Date.now();
+    $('state').textContent = 'open'; $('state').className = 'ok';
+    log('OPEN — upgrade survived the proxy chain', 'ok');
+    // 30s heartbeat. The idle-timeout failure is the one a short test misses.
+    heartbeat = setInterval(() => send({ hb: true }), 30000);
+    timer = setInterval(() => {
+      $('age').textContent = Math.round((Date.now() - openedAt) / 1000) + 's';
+    }, 1000);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'welcome') return log(`welcome id=${m.id}`, 'dim');
+    if (m.payload && m.payload.n !== undefined && pending.has(m.payload.n)) {
+      lats.push(Date.now() - pending.get(m.payload.n));
+      pending.delete(m.payload.n);
+      stats();
+    } else if (m.payload && m.payload.hb) {
+      log('heartbeat ok', 'dim');
+    }
+  };
+  ws.onclose = e => {
+    clearInterval(heartbeat); clearInterval(timer);
+    const held = openedAt ? Math.round((Date.now() - openedAt) / 1000) : 0;
+    $('state').textContent = `closed (${e.code})`;
+    $('state').className = e.code === 1000 ? 'dim' : 'bad';
+    // 1006 after ~60s with no client action is the signature of a proxy idle
+    // timeout, which is exactly what #15 is looking for.
+    log(`CLOSE code=${e.code} wasClean=${e.wasClean} after ${held}s`,
+        e.code === 1000 ? 'dim' : 'bad');
+  };
+  ws.onerror = () => log('ERROR — see close code', 'bad');
+}
+
+let n = 0;
+const send = extra => {
+  if (!ws || ws.readyState !== 1) return;
+  const id = n++;
+  pending.set(id, Date.now());
+  ws.send(JSON.stringify({ n: id, t: Date.now(), ...extra }));
+};
+
+$('start').onclick = () => { lats = []; connect(); };
+$('burst').onclick = async () => {
+  for (let i = 0; i < 100; i++) { send({}); await new Promise(r => setTimeout(r, 20)); }
+  log('burst sent', 'dim');
+};
+$('stop').onclick = () => ws && ws.close(1000, 'manual');
+</script>

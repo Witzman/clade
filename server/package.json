@@ -1,0 +1,10 @@
+{
+  "name": "game-probe",
+  "private": true,
+  "type": "module",
+  "description": "DISPOSABLE. A probe for Sprint 1, not the game server. See workshop issue #14.",
+  "main": "index.js",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

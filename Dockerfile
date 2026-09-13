@@ -1,22 +1,26 @@
-# Placeholder image. It exists to prove the deployment chain end to end
-# before any game code is written: push -> webhook -> Dokploy build -> live.
+# The Sprint 1 probe. Workshop issue #14.
 #
-# It commits to no runtime. The server language is still an open question in
-# notes/specs/2026-09-13-foundation-design.md, and nothing here presumes it.
-FROM nginx:1.27-alpine
+# Replaces the nginx placeholder because a static server cannot hold a
+# connection, and issues #15 and #16 are about what happens to connections.
+# Still serves web/ so the uptime check and the placeholder page keep working.
+#
+# DISPOSABLE. Not a decision about the runtime -- see server/index.js.
+FROM node:22-alpine
 
-COPY web/ /usr/share/nginx/html/
+WORKDIR /app
 
-# /healthz answers 200 with a body of "ok" so a container healthcheck and an
-# uptime probe have something cheap to hit that does not render the page.
-RUN printf '%s\n' \
-    'server {' \
-    '  listen 80;' \
-    '  root /usr/share/nginx/html;' \
-    '  location = /healthz { default_type text/plain; }' \
-    '}' > /etc/nginx/conf.d/default.conf
+# Dependencies first, so a change to the source does not reinstall them.
+COPY server/package.json ./server/
+RUN cd server && npm install --omit=dev --no-audit --no-fund
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+COPY server/ ./server/
+COPY web/ ./web/
+
+ENV PORT=80 WEB_ROOT=/app/web
+EXPOSE 80
+
+# wget is in busybox on alpine, so the healthcheck needs nothing installed.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1/healthz | grep -q ok || exit 1
 
-EXPOSE 80
+CMD ["node", "server/index.js"]
