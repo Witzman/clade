@@ -1,0 +1,62 @@
+name: release-to-production
+
+# A published GitHub Release is what ships to production.
+#
+# It cannot call Dokploy directly: the Dokploy API is firewalled to the
+# server's loopback, and only /api/deploy/* is reachable from the internet.
+# That endpoint takes no branch argument -- it matches the pushed ref against
+# the application's configured branch and refuses anything else.
+#
+# So the release moves the `production` branch to the tagged commit and lets
+# the ordinary push webhook do the rest. Git stays the record of what is
+# deployed, which is the property worth having: `git log production` answers
+# "what is live" without asking Dokploy.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to deploy to production"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the tag being released
+        id: tag
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          [ -n "$tag" ] || { echo "::error::no tag to deploy"; exit 1; }
+          git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null \
+            || { echo "::error::tag $tag does not exist"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse "refs/tags/$tag^{commit}")" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to deploy a tag that is not on main
+        run: |
+          # A tag on an abandoned branch would otherwise ship straight to
+          # production without ever having been on staging.
+          git merge-base --is-ancestor "${{ steps.tag.outputs.sha }}" origin/main \
+            || { echo "::error::${{ steps.tag.outputs.tag }} is not an ancestor of main -- it has never been on staging"; exit 1; }
+
+      - name: Move production to the tagged commit
+        run: |
+          # Force-with-lease is wrong here: production is a pointer to whatever
+          # was last released, and a release legitimately moves it to a commit
+          # that is not a descendant when an older tag is re-released as a
+          # rollback. That is a deliberate, human-initiated action.
+          git push --force origin "${{ steps.tag.outputs.sha }}:refs/heads/production"
+          echo "production -> ${{ steps.tag.outputs.tag }} (${{ steps.tag.outputs.sha }})"
+
+      # The push above fires the repository webhook, which triggers the
+      # Dokploy build. Nothing here needs a Dokploy credential.
