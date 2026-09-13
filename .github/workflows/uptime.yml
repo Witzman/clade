@@ -31,7 +31,13 @@ jobs:
           # Two attempts. One failure is as likely to be a GitHub runner's
           # network as ours, and an alert that cries wolf is one nobody reads.
           for attempt in 1 2; do
-            code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "$url" || echo 000)
+            # Clear the body first. curl leaves the file untouched when the
+            # request fails at the network or TLS layer, so without this the
+            # diagnostic reports the PREVIOUS attempt's body -- which makes a
+            # failed run read as though something was returned when nothing
+            # was. Found by testing against an unresolvable host.
+            : > /tmp/body
+            code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "$url") || code=000
             body=$(cat /tmp/body 2>/dev/null || true)
             if [ "$code" = "200" ] && [ "$body" = "ok" ]; then
               echo "ok (attempt $attempt)"
