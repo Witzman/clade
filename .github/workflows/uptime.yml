@@ -1,0 +1,66 @@
+name: uptime
+
+# Checks the live game from outside, on a schedule.
+#
+# Deliberately NOT on the server. Zabbix and Grafana already run on that host
+# and cannot tell you the host is unreachable -- a check that dies with the
+# thing it watches is not a check. GitHub is an independent vantage point, it
+# needs no credential on our side, and it keeps working unchanged when the
+# project moves to the new VPS.
+#
+# A failed run notifies the repository owner by email. That is the alert;
+# there is no second channel to keep working.
+
+on:
+  schedule:
+    # Every 15 minutes. This repository is public, so Actions minutes are free.
+    # Note: GitHub disables scheduled workflows after 60 days without activity
+    # in the repository.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  reachable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Production answers
+        run: |
+          set -u
+          url="https://game.witzman.de/healthz"
+
+          # Two attempts. One failure is as likely to be a GitHub runner's
+          # network as ours, and an alert that cries wolf is one nobody reads.
+          for attempt in 1 2; do
+            code=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "$url" || echo 000)
+            body=$(cat /tmp/body 2>/dev/null || true)
+            if [ "$code" = "200" ] && [ "$body" = "ok" ]; then
+              echo "ok (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code, body '${body:0:80}'"
+            [ "$attempt" = 1 ] && sleep 20
+          done
+
+          echo "::error::game.witzman.de/healthz did not answer 200/ok"
+          exit 1
+
+  certificate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Certificate has more than 14 days left
+        run: |
+          set -u
+          # certbot renews at 30 days remaining. Below 14 means renewal has
+          # been failing for two weeks -- which is exactly the failure mode
+          # that is otherwise silent until the certificate expires.
+          for host in game.witzman.de staging.game.witzman.de deploy.game.witzman.de; do
+            end=$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null \
+                  | openssl x509 -noout -enddate | cut -d= -f2)
+            [ -n "$end" ] || { echo "::error::could not read certificate for $host"; exit 1; }
+            days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+            echo "$host: $days days left ($end)"
+            if [ "$days" -lt 14 ]; then
+              echo "::error::$host certificate expires in $days days -- renewal is failing"
+              exit 1
+            fi
+          done
