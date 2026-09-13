@@ -45,3 +45,30 @@ jobs:
             exit 1
           fi
           echo "clean"
+
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every asset is credited
+        run: |
+          # Provenance is an obligation that is easy to intend and easy to
+          # skip, and expensive to reverse once published -- this repository
+          # distributes what is in it. So the rule gets a door.
+          [ -d assets ] || { echo "no assets/ directory yet"; exit 0; }
+
+          missing=0
+          while IFS= read -r f; do
+            # The credit row must name the file. Matching on the path rather
+            # than the basename, so two files with the same name in different
+            # directories cannot share one row.
+            grep -qF "$f" CREDITS.md || { echo "uncredited: $f"; missing=1; }
+          done < <(find assets -type f ! -name '.gitkeep')
+
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::asset(s) with no row in CREDITS.md"
+            echo "Add: file | source URL | author | licence | changes made"
+            exit 1
+          fi
+          echo "all assets credited"
