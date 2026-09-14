@@ -405,3 +405,135 @@ test("a restart tells clients, closes 1012, and the new server answers room: nul
     assert.equal((await c.wait(m => m.t === "welcome")).room, null);
   } finally { await s2.close(); }
 });
+
+// ------------------------------------------------- a seat nobody is sitting in
+
+// #36. The client rule that ends the reconnect war is "never reconnect on a
+// 4xxx close". It can only be that simple if the server keeps three promises,
+// which is what this asserts: the code is in the application range, the reason
+// arrives *before* the close so the client can name it, and the socket that
+// did the replacing is the one that now owns the session.
+test("the replaced socket is told why before it is closed, with a 4xxx code", async () => {
+  const s = await server();
+  try {
+    const one = await client(s.port);
+    one.send({ t: "hello", v: 1, id: "twotabs-0012", name: "t", variant: "test" });
+    await one.wait(m => m.t === "welcome");
+    const two = await client(s.port);
+    two.send({ t: "hello", v: 1, id: "twotabs-0012", name: "t", variant: "test" });
+    await two.wait(m => m.t === "welcome");
+
+    const code = (await one.closed).code;
+    assert.ok(code >= 4000 && code <= 4999, `close code ${code} must be in the application range`);
+    assert.deepEqual(JSON.parse(one.raw[one.raw.length - 1]), { t: "error", reason: "replaced" },
+                     "the reason must be the last frame before the close, or the client cannot name it");
+
+    // The newest socket owns the session; the replaced one owns nothing.
+    two.send({ t: "act", do: "sync" });
+    assert.equal((await two.wait(m => m.t === "error")).reason, "not in a match");
+    assert.equal(s.rooms.stats().sessions, 1);
+  } finally { await s.close(); }
+});
+
+// #38. Everything below is the seat interface: the protocol had no
+// server->client message for an empty seat, so a player was told nothing and
+// could lose a match to one.
+test("a dropped opponent is announced at once, and the clock stops with them", async () => {
+  const s = await server({ turnMs: 1000, graceMs: 8000 });
+  try {
+    const a = await player(s.port, "gone-a-0013", "person", 13);
+    const b = await player(s.port, "gone-b-0014", "person", 14);
+    await a.wait(m => m.t === "matched");
+    const round = await a.wait(m => m.do === "round" && m.round === 0);
+    assert.ok(round.deadline > Date.now(), "the clock is running before the drop");
+
+    const t0 = Date.now();
+    b.ws.close();
+    const gone = await a.wait(m => m.do === "opponentGone", 2000);
+    assert.ok(Date.now() - t0 < 1000, `told after ${Date.now() - t0} ms — that is not promptly`);
+    assert.equal(gone.grace, 8000);
+    assert.equal(gone.deadline, null, "the clock must stop while the seat is empty");
+
+    // Well past the turn clock, and no round has been resolved against the
+    // player who is still here.
+    await sleep(2500);
+    assert.equal(a.frames.filter(m => m.do === "reveal").length, 0,
+                 "a round resolved while the opponent's seat was empty");
+    assert.equal(a.frames.some(m => m.t === "result"), false);
+
+    // Back inside the grace period: the clock starts again with what was left.
+    const b2 = await client(s.port);
+    b2.send({ t: "hello", v: 1, id: "gone-b-0014", name: "b", variant: "test" });
+    await b2.wait(m => m.t === "matched");
+    const back = await a.wait(m => m.do === "opponentBack", 2000);
+    assert.ok(back.deadline > Date.now(), "the clock must start again when the seat is filled");
+    assert.ok(back.deadline - Date.now() <= 1000, "and with what was left on it, not a fresh turn");
+    await a.wait(m => m.do === "reveal" && m.round === 0, 3000);
+  } finally { await s.close(); }
+});
+
+test("when the grace period expires the match ends and the player still there wins", async () => {
+  const s = await server({ turnMs: 1000, graceMs: 300 });
+  try {
+    const a = await player(s.port, "walk-a-0015", "person", 15);
+    const b = await player(s.port, "walk-b-0016", "person", 16);
+    const ma = await a.wait(m => m.t === "matched");
+    await a.wait(m => m.do === "round" && m.round === 0);
+    b.ws.close();
+    await a.wait(m => m.do === "opponentGone", 2000);
+    const left = await a.wait(m => m.do === "opponentLeft", 3000);
+    assert.equal(left.deadline, null);
+    const res = await a.wait(m => m.t === "result", 2000);
+    assert.equal(res.winner, ma.side, "the player who is still there wins the seat that emptied");
+    assert.equal(res.reason, "opponentLeft");
+    // The score is what was actually played, not an invented sweep.
+    assert.deepEqual(res.wins, [0, 0]);
+    assert.equal(matchHash(ma.seed, []), res.hash);
+    await sleep(50);
+    assert.equal(s.rooms.stats().rooms, 0);
+  } finally { await s.close(); }
+});
+
+test("an explicit leave ends the match for the opponent immediately, not at the clock", async () => {
+  const s = await server({ turnMs: 20000, graceMs: 60000 });
+  try {
+    const a = await player(s.port, "quit-a-0017", "person", 17);
+    const b = await player(s.port, "quit-b-0018", "person", 18);
+    const ma = await a.wait(m => m.t === "matched");
+    await a.wait(m => m.do === "round" && m.round === 0);
+    const t0 = Date.now();
+    b.send({ t: "leave" });
+    await a.wait(m => m.do === "opponentLeft", 2000);
+    const res = await a.wait(m => m.t === "result", 2000);
+    assert.ok(Date.now() - t0 < 2000, "the remaining player must not sit out the clock");
+    assert.equal(res.winner, ma.side);
+    assert.equal(res.reason, "opponentLeft");
+    // The one who left is told `left`, and is not sent the room's result.
+    assert.equal((await b.wait(m => m.do === "left")).t, "accepted");
+    assert.equal(b.frames.some(m => m.t === "result"), false);
+    await sleep(50);
+    assert.equal(s.rooms.stats().rooms, 0);
+  } finally { await s.close(); }
+});
+
+test("a second tab is not a disconnect: the opponent is told nothing", async () => {
+  const s = await server({ turnMs: 20000, graceMs: 60000 });
+  try {
+    const a = await player(s.port, "tabs-a-0019", "person", 19);
+    const b = await player(s.port, "tabs-b-0020", "person", 20);
+    await a.wait(m => m.t === "matched");
+    await a.wait(m => m.do === "round" && m.round === 0);
+    // B opens the game again in the same browser: the newest socket wins, but
+    // the seat was never empty, so A's clock and A's screen must not move.
+    const b2 = await client(s.port);
+    b2.send({ t: "hello", v: 1, id: "tabs-b-0020", name: "b", variant: "test" });
+    await b2.wait(m => m.t === "matched");
+    assert.equal((await b.closed).code, 4000);
+    await sleep(200);
+    assert.equal(a.frames.some(m => m.do === "opponentGone" || m.do === "opponentBack"
+                                 || m.do === "opponentLeft"), false);
+    // And the match is still playable from the tab that took over.
+    b2.send({ t: "act", do: "sync" });
+    assert.equal((await b2.wait(m => m.do === "sync")).round, 0);
+  } finally { await s.close(); }
+});

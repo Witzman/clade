@@ -20,7 +20,9 @@ type Round = { options: [Genome[], Genome[]]; commits: [number | null, number | 
 type Reveal = { round: number; picks: [number, number]; timedOut: [boolean, boolean];
                 winner: Side | null; ticks: number; hp: [number, number] };
 type State = { round: number; current: Round; wins: [number, number]; history: Reveal[];
-               done: boolean; turnMs: number };
+               done: boolean; turnMs: number;
+               // ms left on the clock while a seat is empty, or null (#38).
+               paused: number | null };
 
 // Distinct streams from one match seed. Integer mixing only.
 const stream = (seed: number, round: number, side: number, purpose: number) =>
@@ -92,7 +94,8 @@ function reveal(room: Room): Outbound[] {
 export function testRoom(turnMs: number): Handler {
   return {
     start(room) {
-      room.state = { round: 0, current: null, wins: [0, 0], history: [], done: false, turnMs } as unknown as State;
+      room.state = { round: 0, current: null, wins: [0, 0], history: [], done: false, turnMs,
+                     paused: null } as unknown as State;
       return beginRound(room, 0);
     },
 
@@ -129,6 +132,37 @@ export function testRoom(turnMs: number): Handler {
       const s = st(room);
       if (s.done) return [];
       return reveal(room);
+    },
+
+    // This room's rule for a seat nobody is sitting in (#38). It is a rule,
+    // not a server default: another variant may keep playing, or seat the
+    // computer.
+    //
+    //   gone  stop the clock. Losing rounds to a drawn pick while the other
+    //         side's grace period runs is how a player lost to an empty seat.
+    //   back  start it again with what was left on it.
+    //   left  the match is over and the player who is still here has won it.
+    //         `wins` is the score as actually played, so a forfeit does not
+    //         pretend to be a 3-0; `reason` says why it ended.
+    seat(room, side, event) {
+      const s = st(room);
+      if (s.done) return [];
+      if (event === "gone") {
+        if (room.deadline !== null) {
+          s.paused = Math.max(0, room.deadline - Date.now());
+          room.deadline = null;
+        }
+        return [];
+      }
+      if (event === "back") {
+        if (s.paused !== null) { room.deadline = Date.now() + s.paused; s.paused = null; }
+        return [];
+      }
+      s.done = true;
+      s.paused = null;
+      room.deadline = null;
+      return [{ to: "both", msg: { t: "result", winner: (side === 0 ? 1 : 0) as Side, wins: s.wins,
+                                  reason: "opponentLeft", hash: matchHash(room.seed, s.history) } }];
     },
   };
 }
