@@ -47,8 +47,8 @@ export const MASK_IDX: number[][] = [
 ];
 export const MASK: boolean[][] = MASK_IDX.map(ix => [0, 1, 2, 3, 4].map(a => ix.includes(a)));
 
-// MASS_RATIO = [0.50, 0.75, 1.00, 1.25, 1.50]; python: repr(m ** e)
-// Generated, not typed: python3 -c "print([m**0.75 for m in (0.5,0.75,1,1.25,1.5)])".
+// MASS_RATIO = [0.50, 0.75, 1.00, 1.25, 1.50]; python: repr(pow(m, e))
+// Generated, not typed: python3 -c "print([pow(m, 0.75) for m in (0.5,0.75,1,1.25,1.5)])".
 // A hand-typed first version of these tables was wrong in six places.
 export const KLEIBER = [0.5946035575013605, 0.8059274488676564, 1.0, 1.1821770112539698, 1.3554030054147672]; // ^0.75
 export const SPEED_POW = [1.624504792712471, 1.2230863395232023, 1.0, 0.8553876799929504, 0.752897956971237]; // ^-0.70
