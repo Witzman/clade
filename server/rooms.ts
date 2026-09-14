@@ -64,6 +64,10 @@ export function createRooms(opts: Options) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
   const alive = new WeakMap<WebSocket, boolean>();
   let stopping = false;
+  // Sockets turned away by the cap since start. Monotonic, reported by
+  // /stats: the cap could otherwise only be observed by reaching it, which on
+  // this host means occupying ~36 of Apache's 150 shared workers (#44).
+  let refused = 0;
 
   const sendTo = (conn: Conn | null, msg: object) => conn?.send(JSON.stringify(msg));
   const sessionOf = (room: Room, side: Side) => {
@@ -339,6 +343,7 @@ export function createRooms(opts: Options) {
   // ------------------------------------------------------------ sockets
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     if (wss.clients.size > opts.maxWs) {
+      refused++;
       opts.log(`full: refused a socket (${wss.clients.size - 1} open, MAX_WS=${opts.maxWs})`);
       ws.send(JSON.stringify({ t: "full" }));
       ws.close(1013, "full");
@@ -373,8 +378,16 @@ export function createRooms(opts: Options) {
     upgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
       wss.handleUpgrade(req, socket, head, ws => wss.emit("connection", ws, req));
     },
+    // Live counts, and the configuration the process is actually running
+    // with. The second half is the point: every one of these values arrives
+    // by environment variable or code default, and until now the only way to
+    // learn the deployed value was to read the container's environment over
+    // SSH, or to trigger the limit (#37, #44). A process that reports its own
+    // configuration can be audited from outside with one request.
     stats: () => ({ connections: wss.clients.size, rooms: rooms.size, sessions: sessions.size,
-                    waiting: waiting.length }),
+                    waiting: waiting.length, refused,
+                    maxWs: opts.maxWs, graceMs: opts.graceMs, turnMs: opts.turnMs,
+                    logDesync: opts.logDesync }),
     seats,
     // A redeploy: every client is told, then closed with 1012 (service restart).
     shutdown() {
