@@ -26,6 +26,12 @@ check() { # check <message> <grep -E pattern>
 check "engine-dependent Math function in $dir/" \
   'Math\.(pow|exp|expm1|log|log1p|log2|log10|sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|hypot|cbrt|random)\b'
 
+# The exponentiation operator is the same implementation-approximated
+# operation as Math.pow (ECMA-262 Number::exponentiate), and V8 and JSC hash
+# 1e6 results differently. `/**` and `**/` are excused so JSDoc still reads.
+check "exponentiation operator in $dir/ (implementation-approximated, like Math.pow)" \
+  '(^|[^/*])\*\*([^/]|$)'
+
 # The same functions reached indirectly: Math["pow"], const { pow } = Math,
 # f(Math). Anything that names Math other than as Math.<name>.
 check "indirect access to Math in $dir/" \
