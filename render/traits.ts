@@ -9,11 +9,11 @@
 // The rules in one paragraph:
 //
 //   * The SILHOUETTE is driven by the five expressed combat numbers -- the same
-//     budget-scaled vector the fight reads. Bulk makes the body deep and the
-//     legs thick. Armour makes the body boxy, domed and plated, and tucks the
-//     legs under it. Speed makes the legs long and thin and the body shallow.
-//     Sharpness puts spikes on the outline. Reach projects the head, the horn
-//     and the tail outward.
+//     budget-scaled vector the fight reads. Bulk makes the body tall and deep
+//     on thick legs, with a level back. Armour makes the body long, low, domed
+//     and plated, and tucks the legs under it. Speed makes the legs long and
+//     thin and the body shallow. Sharpness puts spikes on the outline. Reach
+//     projects the head, the horn and the tail outward.
 //   * FORMS decide topology and placement, never magnitude. The body form picks
 //     the leg count; the weapon form decides whether sharpness shows as a horn,
 //     a sting or an open jaw; the covering form decides whether it shows as
@@ -163,12 +163,17 @@ export function traits(g: Genome): AnatomyTraits {
   const spike = Math.max(head.horn, tail.sting, dorsal);
   if (spike < 0.85 * tE) dorsal += 0.85 * tE - spike;
   const core = {
-    length: clamp01(bCoreLen + 0.35 * rBody + 0.25 * tM),
-    height: clamp01(0.45 + bCoreH + frH + 0.45 * tM - 0.25 * tT - 0.20 * n[M]),
+    // Bulk and armour both thicken an animal, so they must part on the
+    // OUTLINE, which survives 64 px, not on surface detail, which does not.
+    // Bulk stands tall and level-backed (elephant). Armour spreads long and
+    // low under a dome (tortoise). Plates alone were invisible at 64 px (v1).
+    length: clamp01(bCoreLen + 0.35 * rBody + 0.25 * tM + 0.30 * tS),
+    height: clamp01(0.45 + bCoreH + frH + 0.45 * tM - 0.25 * tT - 0.25 * tS - 0.20 * n[M]),
     segments: clampInt(2 + 7 * tS + frSeg, 2, 9),
-    chitin: clamp01(0.30 + 0.70 * tS - 0.25 * n[S] + skChitin + frChitin),
+    // low base: plates draw only above 0.35, so only real armour draws them
+    chitin: clamp01(0.15 + 0.85 * tS - 0.25 * n[S] + skChitin + frChitin),
     dorsal: clamp01(dorsal),
-    hunch: clamp01(0.10 + 0.55 * tS + 0.20 * tM - 0.35 * tT + frHunch),
+    hunch: clamp01(0.05 + 0.75 * tS - 0.35 * tT + frHunch),
   };
 
   // --- 6. limbs ---------------------------------------------------------------
@@ -179,7 +184,7 @@ export function traits(g: Genome): AnatomyTraits {
   if (weapon === WEAPON_SPURS && eWeapon > 0.3) foot = Math.min(foot, 0.2);
   const limbs = {
     count: bCount,
-    length: clamp01(0.50 + bLimbLen + 0.30 * rLimb + 0.35 * tT - 0.30 * tS - 0.15 * n[T]),
+    length: clamp01(0.50 + bLimbLen + 0.30 * rLimb + 0.35 * tT - 0.50 * tS - 0.15 * n[T]),
     joints,
     thickness: clamp01(0.35 + 0.55 * tM - 0.40 * tT - 0.15 * n[M] + 0.10 * n[T]),
     foot: clamp01(foot),

@@ -78,6 +78,14 @@ test("armour looks like armour: the hardest, most plated, most domed body", () =
   assert.equal(strongest(t => t.core.hunch), "ARMOUR");
 });
 
+test("heavy and armoured part on the outline: armour is the flattest body, bulk the tallest", () => {
+  const flat = (t: AnatomyTraits) => (0.13 + 0.20 * t.core.height) / (0.26 + 0.26 * t.core.length); // anatomy.ts core_h / core_w
+  assert.equal(strongest(t => -flat(t)), "ARMOUR");
+  assert.ok(flat(BULK) > 1.5 * flat(ARMOUR), `bulk ${flat(BULK)} vs armour ${flat(ARMOUR)}`);
+  assert.ok(ARMOUR.limbs.length < BULK.limbs.length);
+  assert.ok(BULK.core.hunch < ARMOUR.core.hunch && BULK.core.chitin <= 0.35);
+});
+
 test("quick looks quick: the longest and thinnest legs", () => {
   assert.equal(strongest(t => t.limbs.length), "SPEED");
   assert.equal(strongest(t => -t.limbs.thickness), "SPEED");
