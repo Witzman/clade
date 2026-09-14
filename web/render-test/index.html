@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Render test</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --paper: rgb(232,226,211); --slate: rgb(38,42,48); --ink: rgb(26,22,20); }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--paper); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; }
+  .note { margin: 0 0 12px; max-width: 70ch; }
+  .note strong { background: rgb(222,86,52); color: #fff; padding: 0 4px; border-radius: 2px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .grid canvas { display: block; }
+  .strip { padding: 8px; border-radius: 4px; }
+  .strip.paper { background: var(--paper); outline: 1px solid rgba(0,0,0,.15); }
+  .strip.slate { background: var(--slate); margin-top: 6px; }
+  pre { background: #fff; border: 1px solid rgba(0,0,0,.15); padding: 10px; overflow-x: auto;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+  button, a.btn { font: inherit; padding: 8px 14px; min-height: 40px; border: 1px solid var(--ink);
+           background: #fff; color: var(--ink); border-radius: 4px; cursor: pointer; text-decoration: none;
+           display: inline-block; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  #error { color: rgb(168,40,30); font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Render test</h1>
+  <p class="note">24 creatures from random trait vectors nobody authored, baked at 128 px and drawn as 48 px
+    silhouettes. <strong>Temporary</strong> the trait vectors come from a stand-in random generator in this page,
+    not from genomes: the genome &rarr; traits mapping (workshop issue #26) replaces it when it lands.</p>
+  <div class="bar">
+    <a class="btn" id="reroll" href="?">New set</a>
+    <span id="seedinfo"></span>
+  </div>
+  <p id="error" hidden></p>
+
+  <h2>Timings</h2>
+  <pre id="timings">baking…</pre>
+
+  <h2>Baked, 128 px</h2>
+  <div class="strip paper"><div class="grid" id="baked"></div></div>
+
+  <h2>Silhouettes, 48 px</h2>
+  <div class="strip paper"><div class="grid" id="sil-paper"></div></div>
+  <div class="strip slate"><div class="grid" id="sil-slate"></div></div>
+
+  <script type="module" src="/render-test/main.js"></script>
+</body>
+</html>

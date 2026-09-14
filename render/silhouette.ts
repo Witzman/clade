@@ -10,7 +10,7 @@
 //
 // Cheap enough to rebuild per draw, but cache it anyway.
 
-import { build, type AnatomyTraits } from './anatomy.ts';
+import { scaled, type AnatomyTraits } from './anatomy.ts';
 import { ACCENT, INK, css, familyFor, mix, type RGB } from './palette.ts';
 
 export interface Silhouette {
@@ -39,7 +39,7 @@ function signedArea(pts: number[]): number {
  * opposite winding would otherwise cancel into a hole.
  */
 export function silhouette(traits: AnatomyTraits, size: number): Silhouette {
-  const geo = build(traits, size);
+  const geo = scaled(traits, size);
   const path = new Path2D();
   let top = Infinity, bottom = -Infinity;
   for (const p of geo.parts) {

@@ -48,8 +48,16 @@ export interface AnatomyTraits {
     count: number; // integer 1..6; > 1 is a tentacle cluster
     sting: number; // > 0.25 draws, single tail only
   };
+  /** Body-size class 0..1 (tiny .. huge). Applied by `scaled()`, never by `build()`. */
+  size: number;
   hue: number; // [0,1) -> palette family
   pattern: number; // read by the silhouette surface
+  /**
+   * uint16. Procedural jitter ONLY. Breeding re-rolls it at every birth, so a
+   * child carrying its parent's allele gets a different seed: nothing a player
+   * should recognise across a lineage may key on it.
+   */
+  seed: number;
 }
 
 export type PartKind =
@@ -351,4 +359,32 @@ export function build(c: AnatomyTraits, S: number): Anatomy {
 
   parts.sort((p, q) => p.layer - q.layer); // stable, as Python's sorted()
   return { parts, eyes, ground, core: { cx, cy, w: coreW, h: coreH }, head: { x: hx, y: hy, r: cranR } };
+}
+
+/** Draw scale for a body-size class: 0.70 (tiny) .. 1.00 (huge). */
+export const sizeScale = (size: number) => 0.7 + 0.3 * Math.min(Math.max(size, 0), 1);
+
+/**
+ * `build()` then the body-size scale, applied about (0.46 S, ground 0.90 S) so
+ * the feet stay on the ground line. Kept out of `build()` so that function
+ * stays a line-for-line port of the Python. Scales points and radii, not line
+ * widths: a small creature keeps a contour as legible as a large one's.
+ */
+export function scaled(c: AnatomyTraits, S: number): Anatomy {
+  const geo = build(c, S);
+  const s = sizeScale(c.size);
+  if (s === 1) return geo;
+  const ox = 0.46 * S, oy = geo.ground;
+  const X = (x: number) => ox + (x - ox) * s;
+  const Y = (y: number) => oy + (y - oy) * s;
+  for (const p of geo.parts) {
+    for (let i = 0; i < p.pts.length; i += 2) { p.pts[i] = X(p.pts[i]); p.pts[i + 1] = Y(p.pts[i + 1]); }
+  }
+  return {
+    parts: geo.parts,
+    eyes: geo.eyes.map(([x, y, r]) => [X(x), Y(y), r * s]),
+    ground: geo.ground,
+    core: { cx: X(geo.core.cx), cy: Y(geo.core.cy), w: geo.core.w * s, h: geo.core.h * s },
+    head: { x: X(geo.head.x), y: Y(geo.head.y), r: geo.head.r * s },
+  };
 }

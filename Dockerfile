@@ -5,6 +5,20 @@
 # Still serves web/ so the uptime check and the placeholder page keep working.
 #
 # DISPOSABLE. Not a decision about the runtime -- see server/index.js.
+
+# Browser bundles. esbuild turns render/ + web/**/main.ts into plain JS, and the
+# credited assets are copied under web/ so the static server can reach them.
+# A separate stage, so the dev dependencies never reach the running image.
+# Workshop issue #27.
+FROM node:22-alpine AS web
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY render/ ./render/
+COPY assets/ ./assets/
+COPY web/ ./web/
+RUN npm run build:web
+
 FROM node:22-alpine
 
 WORKDIR /app

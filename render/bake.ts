@@ -13,7 +13,7 @@
 // Stacking, bottom to top, exactly as the Python composites it:
 //   cast shadow, outer ink ring, material body, part contours, eyes.
 
-import { build, type AnatomyTraits, type Anatomy } from './anatomy.ts';
+import { scaled, type AnatomyTraits, type Anatomy } from './anatomy.ts';
 import { ctx2d, makeCanvas, trace, type Ctx2D } from './canvas.ts';
 import { pick, tile, TILE_SCALE, type Material } from './materials.ts';
 import { INK, css, familyFor, mix, type RGB } from './palette.ts';
@@ -194,7 +194,7 @@ export async function bakeNow(traits: AnatomyTraits, px: number): Promise<Baked>
   const B = px;
   const S = B * SS; // geometry units, as the Python builds them
   const k = 1 / SS; // geometry -> bake pixels
-  const geo = build(traits, S);
+  const geo = scaled(traits, S);
   const fam = familyFor(traits.hue);
   const lwGeo = Math.max(2, Math.trunc(S * 0.0026));
   const t1 = performance.now();
