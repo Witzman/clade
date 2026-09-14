@@ -124,11 +124,15 @@ export function startServer(o: ServerOptions): Promise<{ port: number; close(): 
     ok({
       port: typeof addr === "object" && addr ? addr.port : o.port,
       rooms,
-      close: () => new Promise<void>(done => {
-        rooms.shutdown();
-        server.close(() => done());
-        server.closeAllConnections();
-      }),
+      // Let the WebSocket close handshakes finish before dropping connections,
+      // or clients see 1006 instead of 1012 (observed on a docker restart).
+      close: async () => {
+        await rooms.shutdown();
+        await new Promise<void>(done => {
+          server.close(() => done());
+          server.closeAllConnections();
+        });
+      },
     });
   }));
 }

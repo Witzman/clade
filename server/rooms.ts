@@ -320,10 +320,17 @@ export function createRooms(opts: Options) {
       clearInterval(pinger);
       for (const t of clocks.values()) clearTimeout(t);
       for (const s of sessions.values()) if (s.grace) clearTimeout(s.grace);
-      for (const ws of wss.clients) {
+      const open = [...wss.clients];
+      const closed = Promise.all(open.map(ws => new Promise<void>(done => {
+        if (ws.readyState === ws.CLOSED) return done();
+        ws.once("close", () => done());
+      })));
+      for (const ws of open) {
         ws.send(JSON.stringify({ t: "error", reason: "restarting" }));
         ws.close(1012, "restarting");
       }
+      // A client that never answers the close frame does not hold the exit.
+      return Promise.race([closed, new Promise<void>(done => setTimeout(done, 1000).unref())]);
     },
   };
 }

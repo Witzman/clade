@@ -52,7 +52,7 @@ function connect() {
       phase("reconnecting");
       status(`connection lost (${e.code}) — reconnecting…`);
       setTimeout(connect, Math.min(5000, 500 * 2 ** retry++));
-    } else if (document.body.dataset.phase !== "result") {
+    } else if (document.body.dataset.phase !== "result" && document.body.dataset.phase !== "interrupted") {
       phase("menu");
       status(e.code === 1013 ? "server full — try again later" : "idle");
       $("menu").hidden = false;
