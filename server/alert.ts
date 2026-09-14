@@ -85,7 +85,10 @@ export function envConfig(env: NodeJS.ProcessEnv, log: (l: string) => void): Ale
 }
 
 export function createAlerter(cfg: AlertConfig): Alerter {
-  const on = new Set<string>();
+  // key -> the subject it fired with, so the recovery names what recovered
+  // rather than restating a subject rebuilt from the now-healthy numbers
+  // ("RESOLVED: cap approaching: 0/5" reads like a bug, because it is one).
+  const on = new Map<string, string>();
   const lastSent = new Map<string, number>();
   // Alerts are serialised. Two SMTP conversations at once against the same
   // relay is how a burst turns into a rate-limit block, and the burst is
@@ -124,15 +127,16 @@ export function createAlerter(cfg: AlertConfig): Alerter {
           // stays saturated for an hour is one mail, not 240.
           if (throttled(key, now)) return false;
         }
-        on.add(key);
+        on.set(key, subject);
         lastSent.set(key, now);
         await enqueue(subject, body);
         return true;
       }
-      if (!on.has(key)) return false;
+      const was = on.get(key);
+      if (was === undefined) return false;
       on.delete(key);
       lastSent.delete(key);
-      await enqueue(`RESOLVED: ${subject}`, body);
+      await enqueue(`RESOLVED: ${was}`, body);
       return true;
     },
     async event(key, subject, body) {
@@ -222,7 +226,11 @@ export function sendMail(cfg: AlertConfig, subject: string, body: string): Promi
       plain.removeAllListeners("error");
       plain.removeAllListeners("close");
       buf = "";
-      const secure = tlsConnect({ socket: plain, servername: host });
+      // SNI takes a hostname. An IP there is forbidden by RFC 6066 and Node
+      // already warns that it will start ignoring it; production uses a
+      // hostname, a local demonstration may not.
+      const isIp = /^[0-9.]+$/.test(host) || host.includes(":");
+      const secure = tlsConnect(isIp ? { socket: plain } : { socket: plain, servername: host });
       sock = secure;
       attach(secure);
       await new Promise<void>((ok, no) => {

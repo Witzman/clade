@@ -77,7 +77,9 @@ test("recovery is announced, and re-arms the alarm", async () => {
   await watch.tick({ connections: 10 });
   await alerter.pending();
   assert.equal(sent.length, 3);
-  assert.match(sent[1].subject, /^\[test\] RESOLVED: /);
+  // The recovery names what recovered, not a subject rebuilt from the now
+  // healthy numbers: "RESOLVED: cap approaching: 0/10" would read like a bug.
+  assert.equal(sent[1].subject, "[test] RESOLVED: connection cap REACHED: 10/10");
   assert.match(sent[2].subject, /cap REACHED/);
 });
 
