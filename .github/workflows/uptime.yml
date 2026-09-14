@@ -10,10 +10,18 @@ name: uptime
 #
 # A failed run notifies the repository owner by email. That is the alert;
 # there is no second channel to keep working.
+#
+# MEASURED 2026-09-14 (workshop #39): the cron below is best effort and is
+# not honoured. In the 11.6 h after this file landed it should have run about
+# 46 times and ran 3, with gaps of 2-5 h. GitHub drops scheduled runs under
+# load, and a high-frequency cron is dropped first. Treat detection time as
+# hours, not minutes, until a second vantage point exists. The cron stays at
+# 15 minutes because asking for less does not make GitHub run it more often.
 
 on:
   schedule:
-    # Every 15 minutes. This repository is public, so Actions minutes are free.
+    # Asks for every 15 minutes; observed every 2-5 h (see the note above).
+    # This repository is public, so Actions minutes are free.
     # Note: GitHub disables scheduled workflows after 60 days without activity
     # in the repository.
     - cron: "*/15 * * * *"
