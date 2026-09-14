@@ -43,29 +43,33 @@ export function createWatch(alerter: Alerter, o: WatchOptions) {
       // ---- the cap (#18). Someone must find out that players are being
       // turned away, and "approached" has to fire before "hit", because by
       // the time it is hit the damage is already visible to players.
+      //
+      // Two keys, not one. With a single key, "approaching" at 32 held the
+      // alert open, so reaching 40 inside the repeat window was throttled and
+      // nobody was told the cap had actually been hit. "approaching" is only
+      // raised on the way up: a jump straight to the ceiling is one mail
+      // (REACHED), not two.
       const full = s.connections >= o.maxWs;
       const near = s.connections >= warnAt;
-      await alerter.state(
-        "capacity",
-        near,
-        full
-          ? `connection cap REACHED: ${s.connections}/${o.maxWs}`
-          : `connection cap approaching: ${s.connections}/${o.maxWs}`,
-        [
-          `connections : ${s.connections}`,
-          `MAX_WS      : ${o.maxWs}`,
-          `warn at     : ${warnAt}`,
-          s.refused === undefined ? "refused     : (not reported)" : `refused     : ${s.refused}`,
-          s.rooms === undefined ? "" : `rooms       : ${s.rooms}`,
-          s.sessions === undefined ? "" : `sessions    : ${s.sessions}`,
-          "",
-          "MAX_WS is a ceiling on damage to the HOST, not a guess at demand:",
-          "one WebSocket holds one Apache prefork worker of 150 shared with",
-          "unrelated sites (workshop #18). Sockets past the cap get",
-          '{"t":"full"} and close 1013 -- players see a full server, the host',
-          "keeps working. Raise it only after the ingress stops being prefork.",
-        ].filter(Boolean).join("\n"),
-      );
+      const nearOn = near && !(full && !alerter.firing("capacity"));
+      const body = [
+        `connections : ${s.connections}`,
+        `MAX_WS      : ${o.maxWs}`,
+        `warn at     : ${warnAt}`,
+        s.refused === undefined ? "refused     : (not reported)" : `refused     : ${s.refused}`,
+        s.rooms === undefined ? "" : `rooms       : ${s.rooms}`,
+        s.sessions === undefined ? "" : `sessions    : ${s.sessions}`,
+        "",
+        "MAX_WS is a ceiling on damage to the HOST, not a guess at demand:",
+        "one WebSocket holds one Apache prefork worker of 150 shared with",
+        "unrelated sites (workshop #18). Sockets past the cap get",
+        '{"t":"full"} and close 1013 -- players see a full server, the host',
+        "keeps working. Raise it only after the ingress stops being prefork.",
+      ].filter(Boolean).join("\n");
+      await alerter.state("capacity", nearOn,
+        `connection cap approaching: ${s.connections}/${o.maxWs}`, body);
+      await alerter.state("capacity-full", full,
+        `connection cap REACHED: ${s.connections}/${o.maxWs}`, body);
 
       // ---- refusals. A rising counter is the only positive proof that real
       // players were turned away, as opposed to nearly turned away.

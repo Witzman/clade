@@ -63,6 +63,23 @@ test("reaching the ceiling reads differently from approaching it", async () => {
   assert.match(sent[0].subject, /cap REACHED: 10\/10/);
 });
 
+test("reaching the ceiling after the warning is still announced", async () => {
+  // Regression: one shared key let the open "approaching" alert throttle the
+  // REACHED one for the whole repeat window.
+  const { watch, alerter, sent } = watcher(40);
+  await watch.tick({ connections: 32 });
+  await watch.tick({ connections: 40 });
+  await watch.tick({ connections: 35 });
+  await watch.tick({ connections: 0 });
+  await alerter.pending();
+  assert.deepEqual(sent.map(m => m.subject), [
+    "[test] connection cap approaching: 32/40",
+    "[test] connection cap REACHED: 40/40",
+    "[test] RESOLVED: connection cap REACHED: 40/40",
+    "[test] RESOLVED: connection cap approaching: 32/40",
+  ]);
+});
+
 test("a cap that stays hit is one mail, not one per poll", async () => {
   const { watch, alerter, sent } = watcher(10);
   for (let i = 0; i < 50; i++) await watch.tick({ connections: 10 });
