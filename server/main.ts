@@ -16,6 +16,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { createRooms } from "./rooms.ts";
 import type { Options } from "./rooms.ts";
 
@@ -61,17 +62,58 @@ async function serveStatic(root: string, req: IncomingMessage, res: ServerRespon
   } else if (!(await isFile(file)) && !extname(file) && (await isFile(file + ".html"))) {
     file += ".html";
   }
-  if (!(await isFile(file))) return plain(res, 404, "not found");
+  let info;
+  try { info = await stat(file); } catch { return plain(res, 404, "not found"); }
+  if (!info.isFile()) return plain(res, 404, "not found");
 
   const body = await readFile(file);
+  const ext = extname(file).toLowerCase();
+  const etag = etagFor(file, info.size, info.mtimeMs, body);
+  const lastModified = new Date(Math.floor(info.mtimeMs / 1000) * 1000).toUTCString();
+  const headers = {
+    "cache-control": cacheControl(path, ext),
+    etag,
+    "last-modified": lastModified,
+  };
+  const inm = req.headers["if-none-match"];
+  const ims = req.headers["if-modified-since"];
+  const fresh = inm !== undefined
+    ? inm.split(",").some(t => t.trim().replace(/^W\//, "") === etag || t.trim() === "*")
+    : ims !== undefined && Date.parse(ims) >= Date.parse(lastModified);
+  if (fresh) {
+    res.writeHead(304, headers);
+    return res.end();
+  }
   res.writeHead(200, {
-    "content-type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream",
+    "content-type": TYPES[ext] ?? "application/octet-stream",
     "content-length": body.length,
-    // Staging redeploys on every push; a cached page against a new server is
-    // a confusing bug report. The POC pays the bytes.
-    "cache-control": "no-cache",
+    ...headers,
   });
   res.end(req.method === "HEAD" ? undefined : body);
+}
+
+// Caching. Nothing under web/ has a content hash in its name, and staging
+// redeploys on every push, so anything that is code or a page is revalidated
+// on every use (a 304 costs a round trip, not the bytes): a cached bundle
+// running against a newer server is a confusing bug. The credited assets
+// change rarely and are the bulk of the bytes, so they are cached for an hour.
+function cacheControl(path: string, ext: string) {
+  if (path.startsWith("/assets/")) return "public, max-age=3600";
+  if (ext === ".html" || ext === ".js" || ext === ".mjs" || ext === ".css") return "no-cache";
+  return "public, max-age=300";
+}
+
+// A strong ETag from the content, so an identical rebuild keeps its ETag and
+// clients keep their 304s. Hashed once per (file, size, mtime).
+const etags = new Map<string, string>();
+function etagFor(file: string, size: number, mtimeMs: number, body: Buffer) {
+  const key = `${file}\0${size}\0${mtimeMs}`;
+  let tag = etags.get(key);
+  if (!tag) {
+    tag = `"${createHash("sha1").update(body).digest("base64url").slice(0, 22)}"`;
+    etags.set(key, tag);
+  }
+  return tag;
 }
 
 function plain(res: ServerResponse, code: number, text: string) {

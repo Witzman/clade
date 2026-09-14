@@ -107,6 +107,46 @@ test("static serving is generic over the web root, and contained in it", async (
   } finally { await s.close(); }
 });
 
+test("static files carry cache headers and validators, and answer 304", async () => {
+  const base = mkdtempSync(join(tmpdir(), "clade-cache-"));
+  const root = join(base, "web");
+  mkdirSync(join(root, "assets", "materials"), { recursive: true });
+  mkdirSync(join(root, "render-test"), { recursive: true });
+  writeFileSync(join(root, "render-test", "index.html"), "<p>render");
+  writeFileSync(join(root, "render-test", "main.js"), "export {}");
+  writeFileSync(join(root, "assets", "materials", "fur.png"), "png");
+  writeFileSync(join(root, "data.json"), "{}");
+  const s = await server({ webRoot: root });
+  const get = (p: string, headers: Record<string, string> = {}) =>
+    fetch(`http://127.0.0.1:${s.port}${p}`, { headers, redirect: "manual" });
+  try {
+    const cc = async (p: string) => (await get(p)).headers.get("cache-control");
+    assert.equal(await cc("/render-test/"), "no-cache");
+    assert.equal(await cc("/render-test/main.js"), "no-cache");
+    assert.equal(await cc("/assets/materials/fur.png"), "public, max-age=3600");
+    assert.equal(await cc("/data.json"), "public, max-age=300");
+
+    for (const p of ["/render-test/", "/render-test/main.js", "/assets/materials/fur.png"]) {
+      const first = await get(p);
+      const etag = first.headers.get("etag")!;
+      const lm = first.headers.get("last-modified")!;
+      assert.match(etag, /^"[A-Za-z0-9_-]{22}"$/, p);
+      assert.ok(lm, p);
+      const again = await get(p, { "if-none-match": etag });
+      assert.equal(again.status, 304, p);
+      assert.equal(await again.text(), "");
+      assert.equal(again.headers.get("etag"), etag);
+      assert.equal((await get(p, { "if-modified-since": lm })).status, 304, p);
+      assert.equal((await get(p, { "if-none-match": '"stale"' })).status, 200, p);
+    }
+    // /healthz is not a static file and stays exactly as it was: no validators.
+    const h = await get("/healthz", { "if-none-match": "*" });
+    assert.equal(h.status, 200);
+    assert.equal(h.headers.get("etag"), null);
+    assert.equal(await h.text(), "ok");
+  } finally { await s.close(); }
+});
+
 test("the real web/ tree serves the placeholders and the test room", async () => {
   const s = await server();
   try {
