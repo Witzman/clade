@@ -6,10 +6,18 @@
 //
 //   PORT        listen port                               (80)
 //   WEB_ROOT    directory served as the site               (/app/web)
-//   MAX_WS      sockets beyond this get {t:"full"}         (100)
+//   MAX_WS      sockets beyond this get {t:"full"}         (40)
 //   LOG_DESYNC  1 = log replay mismatches with user agent  (off)
 //   GRACE_MS    reconnect grace period                     (60000)
 //   TURN_MS     the test room's decision clock             (20000)
+//
+// MAX_WS is a ceiling on damage to the HOST, not a guess at demand (workshop
+// #18). This host's Apache is mpm_prefork with MaxRequestWorkers 150, shared
+// with the owner's mail interface and two other sites, and one WebSocket holds
+// one whole Apache process: measured 0.88 processes per connection at 50
+// connections, 0.78 at 20. At 40 the game can occupy about 35 of the 150, so
+// a busy game queues instead of taking unrelated sites down with it. Raise it
+// only after the ingress stops being Apache prefork.
 
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -184,12 +192,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const s = await startServer({
     port: Number(env.PORT || 80),
     webRoot: env.WEB_ROOT || "/app/web",
-    maxWs: Number(env.MAX_WS || 100),
+    maxWs: Number(env.MAX_WS || 40),
     logDesync: env.LOG_DESYNC === "1",
     graceMs: Number(env.GRACE_MS || 60000),
     turnMs: Number(env.TURN_MS || 20000),
   });
-  console.log(`clade server on ${s.port} (MAX_WS=${env.MAX_WS || 100})`);
+  console.log(`clade server on ${s.port} (MAX_WS=${env.MAX_WS || 40})`);
   // Last backstop (#34): a bug in one room handler must not end the process
   // and every match with it. Per-socket and per-room catches live in
   // rooms.ts; this catches what escapes a timer or a promise.

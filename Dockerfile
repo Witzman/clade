@@ -24,7 +24,7 @@ COPY core/ ./core/
 COPY server/ ./server/
 COPY --from=web /build/web/ ./web/
 
-ENV PORT=80 WEB_ROOT=/app/web MAX_WS=100
+ENV PORT=80 WEB_ROOT=/app/web MAX_WS=40
 EXPOSE 80
 
 # wget is in busybox on alpine, so the healthcheck needs nothing installed.
