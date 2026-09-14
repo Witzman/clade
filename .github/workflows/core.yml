@@ -57,6 +57,20 @@ jobs:
       - name: node --test tests/render-traits.test.ts
         run: node --test tests/render-traits.test.ts
 
+  # The shared audio module (audio/), driven with a counting fake Web Audio
+  # context: nothing before a gesture, muted does no work, the voice cap holds.
+  audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/audio.test.ts
+        run: node --test tests/audio.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
