@@ -11,7 +11,7 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 import type { Genome } from "../core/index.ts";
-import type { Handler, Outbound, Room, Side } from "./types.ts";
+import type { Handler, Outbound, Room, SeatEvent, Side } from "./types.ts";
 import { RESULT } from "./types.ts";
 import { testRoom } from "./testroom/room.ts";
 import { checkDecisions, replay, toHex } from "./testroom/run.ts";
@@ -102,6 +102,29 @@ export function createRooms(opts: Options) {
       if (s.computer) { s.conn?.close(1000, "match over"); sessions.delete(s.id); }
       else if (!s.conn) { clearTimeout(s.grace!); sessions.delete(s.id); }
     }
+  }
+
+  // A seat emptied, filled again, or emptied for good. The protocol had no
+  // server->client message for it, so a player whose opponent walked out was
+  // told nothing and could lose to an empty seat (#38).
+  //
+  // The server sends the notification — it owns sockets and the grace period,
+  // and every variant inherits the message whether or not it implements a
+  // rule. The handler decides what an empty seat *means*, and the notification
+  // carries the clock as the handler left it, so a room that stops the clock
+  // while a seat is empty can say so in the same frame.
+  const SEAT_DO: Record<SeatEvent, string> =
+    { gone: "opponentGone", back: "opponentBack", left: "opponentLeft" };
+
+  function seatChanged(room: Room, side: Side, event: SeatEvent) {
+    if (!rooms.has(room.id)) return;
+    const h = handlers.get(room.variant);
+    guard(room, () => {
+      const out = h?.seat?.(room, side, event) ?? [];
+      const msg: Record<string, unknown> = { t: "accepted", do: SEAT_DO[event], deadline: room.deadline };
+      if (event === "gone") msg.grace = opts.graceMs;
+      dispatch(room, [{ to: other(side), msg } as Outbound, ...out]);
+    });
   }
 
   function match(a: Session, b: Session) {
@@ -201,6 +224,10 @@ export function createRooms(opts: Options) {
 
     let s = sessions.get(m.id);
     if (s && s.variant !== m.variant && !s.room) s = undefined;
+    // A seat whose socket had dropped and whose grace period is still running:
+    // the opponent was told "gone" and has to be told "back" (#38). A second
+    // tab replacing a live socket is not that — nobody was ever told anything.
+    const returning = !!s && !s.conn && !!s.room;
     if (s) {
       if (s.conn && s.conn !== conn) {
         // The same identity in a second tab or after a network change: the
@@ -222,6 +249,7 @@ export function createRooms(opts: Options) {
     if (s.room) {
       opts.log(`resume ${s.id} into room ${s.room.id}`);
       sendTo(conn, matched(s.room, s.side));
+      if (returning) seatChanged(s.room, s.side, "back");
     }
   }
 
@@ -279,8 +307,12 @@ export function createRooms(opts: Options) {
     const room = s.room;
     if (room) {
       s.room = null;
+      if (s.grace) { clearTimeout(s.grace); s.grace = null; }
       const opp = sessionOf(room, other(s.side));
       if (!opp || opp.computer) endRoom(room);
+      // Someone is still sitting there: tell them, and let the room's rule
+      // decide what an abandoned match becomes (#38).
+      else seatChanged(room, s.side, "left");
     }
     sendTo(s.conn, { t: "accepted", do: "left" });
   }
@@ -295,10 +327,13 @@ export function createRooms(opts: Options) {
       sessions.delete(s.id);
       const room = s.room;
       if (!room) return;
+      s.room = null;
       opts.log(`grace expired ${s.id} in room ${room.id}`);
       const opp = sessionOf(room, other(s.side));
-      if (!opp || opp.computer) endRoom(room);
+      if (!opp || opp.computer) return endRoom(room);
+      seatChanged(room, s.side, "left");
     }, opts.graceMs);
+    seatChanged(s.room, s.side, "gone");
   }
 
   // ------------------------------------------------------------ sockets

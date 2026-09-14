@@ -33,19 +33,30 @@ let ws: WebSocket | null = null;
 let want: "computer" | "person" | null = null;
 let side = 0, seed = 0, round = -1, deadline: number | null = null, committed = false;
 let reveals: { picks: number[]; hp: number[] }[] = [];
-let retry = 0;
+let retry = 0, openedAt = 0, lastError = "";
 
 const phase = (p: string) => { document.body.dataset.phase = p; };
 const status = (s: string) => { $("status").textContent = s; };
 const log = (s: string) => { $("log").textContent = s + "\n" + $("log").textContent; };
+const notice = (s: string | null) => { $("notice").hidden = !s; $("notice").textContent = s ?? ""; };
 const send = (m: object) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
 
 function connect() {
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-  ws.onopen = () => { retry = 0; send({ t: "hello", v: 1, id, name: `player ${id.slice(0, 4)}`, variant: "test" }); };
+  ws.onopen = () => { openedAt = Date.now(); send({ t: "hello", v: 1, id, name: `player ${id.slice(0, 4)}`, variant: "test" }); };
   ws.onmessage = e => onMessage(JSON.parse(e.data));
   ws.onclose = e => {
     ws = null;
+    // 4xxx is an application close: the server shut this socket deliberately
+    // and said why in the `error` frame just before it. Reconnecting would
+    // undo the server's decision — and when the reason is "replaced", two tabs
+    // of the same player reconnect over each other for as long as both are
+    // open (#36). This is the one close that is not a lost connection.
+    if (e.code >= 4000 && e.code <= 4999) return closedByServer();
+    // Only a connection that lasted counts as a good one. Resetting the
+    // backoff in `onopen` made every retry the first retry, so a socket closed
+    // the moment it opened looped at 500 ms forever.
+    if (openedAt && Date.now() - openedAt > 5000) retry = 0;
     if (store.get(ROOM_KEY)) {
       // In a match: reconnect. Whether the match survived is the server's
       // answer in `welcome`, not a guess made here.
@@ -58,6 +69,19 @@ function connect() {
       $("menu").hidden = false;
     }
   };
+}
+
+// The server closed this socket on purpose. Say so and stop: the room key is
+// deliberately left in localStorage, because the tab that replaced this one
+// shares it and is using the match.
+function closedByServer() {
+  phase(lastError === "replaced" ? "replaced" : "closed");
+  $("match").hidden = true;
+  notice(lastError === "replaced"
+    ? "This match is open in another tab. That tab has it now — reload this page to take it back."
+    : `The server closed this connection${lastError ? `: ${lastError}` : ""}.`);
+  status(lastError === "replaced" ? "open in another tab" : "disconnected");
+  deadline = null;
 }
 
 function onMessage(m: any) {
@@ -95,8 +119,10 @@ function onMessage(m: any) {
       const mine = matchHash(seed, reveals);
       const verdict = mine === m.hash ? "verified" : `MISMATCH (local ${mine})`;
       const outcome = m.winner === null ? "draw" : m.winner === side ? "you won" : "you lost";
+      const why = m.reason === "opponentLeft" ? " (the opponent left)" : "";
       $("result").hidden = false;
-      $("result").textContent = `result: ${outcome} ${m.wins[side]}–${m.wins[1 - side]} · hash ${m.hash} ${verdict}`;
+      $("result").textContent = `result: ${outcome}${why} ${m.wins[side]}–${m.wins[1 - side]} · hash ${m.hash} ${verdict}`;
+      notice(null);
       store.del(ROOM_KEY);
       phase("result");
       status("match over");
@@ -105,6 +131,7 @@ function onMessage(m: any) {
       return;
     }
     case "error": {
+      lastError = String(m.reason ?? "");
       log(`error: ${m.reason}`);
       if (m.reason === "restarting") status("the server is restarting…");
       return;
@@ -123,6 +150,25 @@ function accepted(m: any) {
       if (!m.done) showRound(m.round, m.deadline, m.options, m.myCommit, m.opponentCommitted);
       return;
     case "commit": committed = true; phase("committed"); return status("chosen — waiting for the reveal");
+    // The seat opposite emptied, filled again, or emptied for good (#38). The
+    // clock comes with the message because the room stops it while the seat is
+    // empty, so nobody loses a round to somebody else's dropped connection.
+    case "opponentGone":
+      deadline = m.deadline ?? null;
+      $("opponent").dataset.gone = "1";
+      notice(`The opponent's connection dropped. The clock is stopped; they have ` +
+             `${Math.round((m.grace ?? 0) / 1000)} s to come back.`);
+      return log("the opponent's connection dropped");
+    case "opponentBack":
+      deadline = m.deadline ?? null;
+      $("opponent").dataset.gone = "";
+      notice(null);
+      return log("the opponent is back");
+    case "opponentLeft":
+      deadline = m.deadline ?? null;
+      $("opponent").dataset.gone = "1";
+      notice("The opponent has left the match.");
+      return log("the opponent left the match");
     case "opponentCommitted": return $("opponent").dataset.committed = "1", log(`round ${m.round + 1}: opponent has chosen`);
     case "reveal": {
       reveals.push({ picks: m.picks, hp: m.hp });
@@ -171,6 +217,7 @@ function start(vs: "computer" | "person") {
   $("menu").hidden = true;
   $("result").hidden = true;
   $("interrupted").hidden = true;
+  notice(null);
   status("connecting…");
   if (ws) ws.close();
   connect();
