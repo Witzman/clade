@@ -153,6 +153,26 @@ const flat = (pts: Pt[]) => {
   return out;
 };
 
+/**
+ * Limb half-width, as a fraction of S, at `limbs.thickness` 0 and 1.
+ *
+ * The Python had 0.010 .. 0.062. Widened for workshop #32: at 64 px a thin leg
+ * is mostly the ink ring and renders as a near-black bar, so a 2 px black bar
+ * and a 6 px grey column read as the same weight and leg thickness stopped
+ * separating "quick" from "heavy". A pillar has to be a pillar.
+ */
+/**
+ * Leg length, as a fraction of S, at `limbs.length` 0 and 1. The Python had
+ * 0.100 .. 0.440. Widened for workshop #32 with the same reasoning as the
+ * radii: ground clearance is the outline cue that separates a sprinter from a
+ * heavy animal, and at 64 px the old range left them a few pixels apart.
+ */
+export const LEG_L0 = 0.06;
+export const LEG_L1 = 0.46;
+
+export const LIMB_R0 = 0.008;
+export const LIMB_R1 = 0.078;
+
 export function build(c: AnatomyTraits, S: number): Anatomy {
   const H = c.head, C = c.core, L = c.limbs, T = c.tail;
   const parts: Part[] = [];
@@ -160,7 +180,7 @@ export function build(c: AnatomyTraits, S: number): Anatomy {
     parts.push({ pts: flat(p.pts), layer: p.layer, kind: p.kind, shade: p.shade ?? 1.0, closed: p.closed ?? true });
 
   const ground = 0.9 * S;
-  const legLen = (0.1 + 0.34 * L.length) * S;
+  const legLen = (LEG_L0 + LEG_L1 * L.length) * S;
   const coreW = (0.26 + 0.26 * C.length) * S;
   const coreH = (0.13 + 0.2 * C.height) * S;
   const cx = 0.46 * S;
@@ -211,7 +231,7 @@ export function build(c: AnatomyTraits, S: number): Anatomy {
   // limbs
   const pairs = Math.max(1, Math.trunc(L.count / 2));
   const spread = coreW * (0.3 + 0.58 * L.splay);
-  const thick = (0.01 + 0.052 * L.thickness) * S;
+  const thick = (LIMB_R0 + LIMB_R1 * L.thickness) * S;
 
   const oneLimb = (hx: number, hy: number, front: boolean, t: number) => {
     const seg = Math.max(2, L.joints);

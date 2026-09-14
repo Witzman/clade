@@ -50,7 +50,7 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const clampInt = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(x)));
 
 // head form -> [length, depth, gape]: biting jaws, beak, heavy jaw, long snout, rasping tongue
-const HEAD_BASE = [[0.35, 0.50, 0.45], [0.55, 0.30, 0.10], [0.25, 0.75, 0.35], [0.65, 0.30, 0.20], [0.20, 0.55, 0.15]];
+const HEAD_BASE = [[0.32, 0.50, 0.45], [0.40, 0.30, 0.10], [0.26, 0.75, 0.35], [0.44, 0.30, 0.20], [0.24, 0.55, 0.15]];
 // body form -> [leg count, splay, core length, core height, limb length, tail length, tail count]
 // two legs, four legs, long body, spoke body, wings
 const BODY_BASE = [
@@ -89,9 +89,17 @@ export function traits(g: Genome): AnatomyTraits {
   const u: number[] = [];
   for (let a = 0; a < NA; a++) u.push(Math.max(-1, Math.min(1, p.v[a] / V_SAT)));
   const lead = Math.max(0, ...u);
-  // mild emphasis on the leading dimension, so a creature reads as its best
-  // trait first. It never adds a cue that is absent: 0 stays 0.
-  const t = u.map(x => (x > 0 && lead > 0 ? x * (0.65 + 0.35 * (x / lead)) : 0));
+  // Emphasis on the LEADING dimension, so a creature reads as its best trait
+  // first. It never adds a cue that is absent: 0 stays 0, and the leading
+  // dimension is drawn at its full size.
+  //
+  // The curve is square rather than linear (workshop #32). With the linear
+  // one, a secondary dimension at half the lead still drew 41 % of a full cue,
+  // and the most salient cue on this creature -- the dorsal spine row -- won
+  // the read whatever the creature was actually best at: in an 80-creature
+  // blind read, sharp was named 25 times out of 16. Cue salience has to follow
+  // magnitude, or the picture answers a question nobody asked.
+  const t = u.map(x => (x > 0 && lead > 0 ? x * (0.30 + 0.70 * (x / lead) * (x / lead)) : 0));
   const n = u.map(x => Math.max(0, -x)); // real deficiencies
   const [tM, tR, tE, tT, tS] = [t[M], t[R], t[E], t[T], t[S]];
 
@@ -113,12 +121,12 @@ export function traits(g: Genome): AnatomyTraits {
 
   // --- 3. head --------------------------------------------------------------
   let length = hLen + 0.50 * rHead + (weapon === WEAPON_FANGS ? 0.40 * rWeapon : 0) - 0.20 * n[R];
-  length = Math.max(length, hLen + 0.45 * tR); // the snout always carries at least half the reach
+  length = Math.max(length, hLen + 0.60 * tR); // the snout always carries most of the reach
   const horn = weapon === WEAPON_HORN || weapon === WEAPON_TUSKS
     ? (weapon === WEAPON_TUSKS ? 0.8 : 1) * eWeapon + 0.5 * rWeapon : 0;
   const head = {
     length: clamp01(length),
-    depth: clamp01(hDepth + 0.35 * tM - 0.15 * n[M]),
+    depth: clamp01(hDepth + 0.35 * tM - 0.15 * tT - 0.15 * n[M]),
     gape: clamp01(hGape + (weapon === WEAPON_FANGS ? 0.60 * eWeapon : 0) + 0.45 * eHead),
     fringe: clamp01(skFringe + (cover === COVER_HAIRS ? 0.25 : 0)),
     horn: clamp01(horn),
@@ -131,7 +139,7 @@ export function traits(g: Genome): AnatomyTraits {
   const sting = weapon === WEAPON_STINGER ? clamp01(eWeapon + 0.3 * rWeapon) : 0;
   const tail = {
     length: clamp01(0.30 + bTailLen + kTailLen + 0.30 * rBody
-      + (weapon === WEAPON_STINGER ? 0.35 * rWeapon : 0) + 0.10 * tT - 0.20 * n[R]),
+      + (weapon === WEAPON_STINGER ? 0.35 * rWeapon : 0) + 0.30 * tT - 0.20 * n[R]),
     count: sting > 0.25 ? 1 : bTailCount, // a sting is only drawn on a single tail
     sting,
   };
@@ -149,11 +157,11 @@ export function traits(g: Genome): AnatomyTraits {
     // OUTLINE, which survives 64 px, not on surface detail, which does not.
     // Bulk stands tall and level-backed (elephant). Armour spreads long and
     // low under a dome (tortoise). Plates alone were invisible at 64 px (v1).
-    length: clamp01(bCoreLen + 0.35 * rBody + 0.25 * tM + 0.30 * tS),
-    height: clamp01(0.45 + bCoreH + frH + 0.45 * tM - 0.25 * tT - 0.25 * tS - 0.20 * n[M]),
+    length: clamp01(bCoreLen + 0.35 * rBody + 0.25 * tM + 0.30 * tS - 0.25 * tT),
+    height: clamp01(0.45 + bCoreH + frH + 0.45 * tM - 0.32 * tT - 0.25 * tS - 0.20 * n[M]),
     segments: clampInt(2 + 7 * tS + frSeg, 2, 9),
     // low base: plates draw only above 0.35, so only real armour draws them
-    chitin: clamp01(0.15 + 0.85 * tS - 0.25 * n[S] + skChitin + frChitin),
+    chitin: clamp01(0.10 + 0.90 * tS - 0.25 * n[S] + 0.6 * (skChitin + frChitin)),
     dorsal: clamp01(dorsal),
     hunch: clamp01(0.05 + 0.75 * tS - 0.35 * tT + frHunch),
   };
@@ -166,7 +174,7 @@ export function traits(g: Genome): AnatomyTraits {
   if (weapon === WEAPON_SPURS && eWeapon > 0.3) foot = Math.min(foot, 0.2);
   const limbs = {
     count: bCount,
-    length: clamp01(0.50 + bLimbLen + 0.30 * rLimb + 0.35 * tT - 0.50 * tS - 0.15 * n[T]),
+    length: clamp01(0.50 + bLimbLen + 0.15 * rLimb + 0.45 * tT + 0.20 * tM - 0.50 * tS - 0.15 * n[T]),
     joints,
     thickness: clamp01(0.35 + 0.55 * tM - 0.40 * tT - 0.15 * n[M] + 0.10 * n[T]),
     foot: clamp01(foot),
