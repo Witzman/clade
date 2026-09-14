@@ -30,6 +30,7 @@ CI enforces that rather than trusting it:
 |---|---|
 | golden hashes under V8 and JavaScriptCore | `node tests/determinism.test.ts` · `bun tests/determinism.test.ts` |
 | no engine-dependent maths, clocks or outside imports in `core/` | `bash tests/core-purity.sh` |
+| that check is not itself full of holes | `bash tests/core-purity.test.sh` |
 | types | `npm ci && npx tsc --noEmit` |
 | the server: static files, `/healthz`, rooms, hidden commits, the computer seat, reconnect, `MAX_WS` | `node --test tests/server.test.ts` |
 

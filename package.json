@@ -8,6 +8,7 @@
     "build:web": "esbuild \"web/**/main.ts\" --bundle --format=esm --target=es2020,safari15 --outdir=web --outbase=web --log-level=warning && rm -rf web/assets && cp -R assets web/assets",
     "test:determinism": "node tests/determinism.test.ts",
     "test:purity": "bash tests/core-purity.sh core",
+    "test:purity-gate": "bash tests/core-purity.test.sh",
     "test:server": "node --test tests/server.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json"
   },

@@ -3,8 +3,14 @@
 # JavaScript engine, may not touch the outside world, and may not import from
 # outside itself. Workshop issues #23, #24.
 #
-# A grep: crude, and sufficient. It scans comments too, so write prose in
-# core/ without the forbidden names. Usage: tests/core-purity.sh [dir]
+# A grep: crude, and sufficient. It scans comments and strings too, so write
+# prose in core/ without the forbidden names and without the two characters
+# `**` (see the exponentiation check below). Usage: tests/core-purity.sh [dir]
+#
+# The gate has its own test: tests/core-purity.test.sh, which mutates a
+# throwaway directory one line at a time and asserts the verdict. Change a
+# pattern here and add the mutation there, or the next hole lives as long as
+# the last one did (workshop #35, then #43).
 set -euo pipefail
 
 dir="${1:-core}"
@@ -28,9 +34,20 @@ check "engine-dependent Math function in $dir/" \
 
 # The exponentiation operator is the same implementation-approximated
 # operation as Math.pow (ECMA-262 Number::exponentiate), and V8 and JSC hash
-# 1e6 results differently. `/**` and `**/` are excused so JSDoc still reads.
-check "exponentiation operator in $dir/ (implementation-approximated, like Math.pow)" \
-  '(^|[^/*])\*\*([^/]|$)'
+# 1e6 results differently.
+#
+# NO EXEMPTION, deliberately (workshop #43). The operator's token is exactly
+# the two characters `**` and nothing can be written between them, so every
+# occurrence of that sequence is either the operator or prose -- but the
+# converse is not decidable by grep: `**` next to a `/` is a JSDoc delimiter
+# in one file, and in the next it is a block comment shoved between the
+# operands -- node evaluates `a ** /*c*/ b` with those spaces removed as
+# plain `a ** b`. The old exemption for `/**` and `**/` let five such
+# spellings through (workshop #43 has them, with node's output).
+# So core/ forbids the two characters outright and uses `//` comments; a
+# pattern with no exemption has nothing to hide behind.
+check "the characters \`**\` in $dir/ -- exponentiation is implementation-approximated, like Math.pow; core/ uses // comments, not /** */" \
+  '\*\*'
 
 # The same functions reached indirectly: Math["pow"], const { pow } = Math,
 # f(Math). Anything that names Math other than as Math.<name>.
@@ -49,6 +66,17 @@ if [ -n "$bad" ]; then
   fail=1
 fi
 check "dynamic import or require in $dir/" '\bimport[[:space:]]*\(|\brequire[[:space:]]*\('
+
+# A symlink inside $dir is read by nothing here -- `grep -r` does not follow
+# one -- but node does, so a link to a file outside core/ would run with none
+# of the rules above applied. Found while closing #43; there is no legitimate
+# use for one in core/.
+links=$(find "$dir" -type l || true)
+if [ -n "$links" ]; then
+  echo "::error::symlink in $dir/ -- every file $dir/ runs must live in $dir/"
+  echo "$links"
+  fail=1
+fi
 
 if [ "$fail" -ne 0 ]; then
   exit 1
