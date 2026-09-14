@@ -1,8 +1,9 @@
-// Tests for the genome -> anatomy mapping. Run: node --test render/
+// Tests for the genome -> anatomy mapping (render/traits.ts). Run: node --test tests/render-traits.test.ts
 // (Node 22 strips the types; nothing to build.)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { traits, type AnatomyTraits } from "./traits.ts";
+import { traits } from "../render/traits.ts";
+import type { AnatomyTraits } from "../render/anatomy.ts";
 import { rng, founder, breed, GENOME_B, NL, NA, int, type Genome } from "../core/index.ts";
 
 // The #21 functional masks: which three dimensions each system may express.

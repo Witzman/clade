@@ -32,27 +32,9 @@
 // need nothing but + - * / and min/max anyway.
 
 import { express, form, ALLELE_B, NA, type Genome } from "../core/index.ts";
-
-// The contract is declared and exported by render/anatomy.ts (the consumer,
-// workshop #27). Until that lands on main this is an identical local copy;
-// when it does, delete this block and `import type { AnatomyTraits } from
-// "./anatomy.ts"`.
-export type AnatomyTraits = {
-  head: { length: number; depth: number; gape: number; fringe: number; horn: number;
-          eyes: number; eyeSize: number; stalks: number };
-  core: { length: number; height: number; segments: number;
-          chitin: number; dorsal: number; hunch: number };
-  limbs: { count: number; length: number; joints: number;
-           thickness: number; foot: number; splay: number };
-  tail: { length: number; count: number; sting: number };
-  /** body-size class 0..1. Draw scale 0.70 + 0.30 * size about the ground-line centre. */
-  size: number;
-  /** 0..1, a palette family index. Heritable, carries no combat meaning. */
-  hue: number;
-  pattern: number;
-  /** u16 for procedural jitter only. Re-rolled at every birth: never a lineage identity. */
-  seed: number;
-};
+// The contract (field meanings, ranges, the size and seed rules) is declared
+// by the consumer, render/anatomy.ts.
+import type { AnatomyTraits } from "./anatomy.ts";
 
 // body systems, in the core's SYSTEMS order
 const SIZE = 0, SKIN = 1, BODY = 2, FRONT = 3, BACK = 4, HEAD = 5,
