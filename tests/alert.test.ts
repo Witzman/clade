@@ -113,7 +113,7 @@ test("a rising refusal counter is its own alarm -- proof players were turned awa
   assert.match(sent[0].subject, /sockets refused: 4 more \(4 since start\)/);
 });
 
-test("a missing refusal counter is not an error -- #44 may not have landed", async () => {
+test("a missing refusal counter is not an error", async () => {
   const { watch, alerter, sent } = watcher(10);
   await watch.tick({ connections: 10 });
   await alerter.pending();

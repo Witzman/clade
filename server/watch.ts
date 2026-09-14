@@ -5,15 +5,12 @@
 // behaviour; `startWatch()` is just a `setInterval` around it.
 //
 // WHY POLLING AND NOT A HOOK IN rooms.ts. The refusal branch in
-// `server/rooms.ts` is the obvious place to raise "the cap is being hit", and
-// it is deliberately left alone: #44 is editing that same branch and
-// `rooms.stats()` in parallel, and a poll of the stats object produces the
-// same alarm with a diff that cannot conflict. It also means the alarm works
-// on a server whose refusal path is later rewritten.
+// `server/rooms.ts` is the obvious place to raise "the cap is being hit". A
+// poll of `rooms.stats()` gives the same alarm without coupling the alarm to
+// that branch, so it keeps working if the refusal path is rewritten.
 //
-// `refused` is read if it is present (it is #44's field) and ignored if it is
-// not. Without it the ceiling itself is an exact proxy: a socket can only be
-// refused when connections has reached maxWs.
+// `refused` (workshop #44) is read when present. Without it the ceiling is an
+// exact proxy: a socket can only be refused once connections reach maxWs.
 
 import { readFile } from "node:fs/promises";
 import type { Alerter } from "./alert.ts";
