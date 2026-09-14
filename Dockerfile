@@ -14,6 +14,7 @@ FROM node:22-alpine AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
+COPY core/ ./core/
 COPY render/ ./render/
 COPY assets/ ./assets/
 COPY web/ ./web/
