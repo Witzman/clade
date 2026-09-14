@@ -24,7 +24,12 @@ COPY core/ ./core/
 COPY server/ ./server/
 COPY --from=web /build/web/ ./web/
 
-ENV PORT=80 WEB_ROOT=/app/web MAX_WS=40
+# LOG_DESYNC=1 is on in the image, not in the deploy platform's environment
+# store: both environments want it, the store is stripped from the exported
+# configuration and so is invisible to git, and a replay mismatch that is not
+# tampering IS the cross-engine determinism measurement — unlogged, it is
+# thrown away (workshop #37). The line only appears when a replay disagrees.
+ENV PORT=80 WEB_ROOT=/app/web MAX_WS=40 LOG_DESYNC=1
 EXPOSE 80
 
 # wget is in busybox on alpine, so the healthcheck needs nothing installed.

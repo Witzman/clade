@@ -318,6 +318,47 @@ test("MAX_WS refuses the socket beyond the cap with {t:\"full\"}", async () => {
   } finally { await s.close(); }
 });
 
+// The cap works (above). This is about being able to CHECK that it works on a
+// deployment without exhausting it: on the POC host one WebSocket holds one
+// whole Apache prefork worker, shared with unrelated sites, so "open sockets
+// until one is refused" is the very thing the cap exists to prevent anyone
+// doing (#44). The same applies to every other knob: LOG_DESYNC decides
+// whether a determinism measurement is kept or discarded, and its value was
+// readable only from the container's environment over SSH (#37).
+test("/stats reports the configured ceiling, the other options, and a refusal count", async () => {
+  const s = await server({ maxWs: 2, graceMs: 1234, turnMs: 5678, logDesync: true });
+  const stats = async () => (await fetch(`http://127.0.0.1:${s.port}/stats`)).json() as Promise<any>;
+  try {
+    const before = await stats();
+    assert.equal(before.maxWs, 2, "the ceiling the process is running with");
+    assert.equal(before.graceMs, 1234);
+    assert.equal(before.turnMs, 5678);
+    assert.equal(before.logDesync, true);
+    assert.equal(before.refused, 0);
+
+    await client(s.port);
+    await client(s.port);
+    const third = await client(s.port);
+    await third.wait(m => m.t === "full");
+    await third.closed;
+
+    const after = await stats();
+    assert.equal(after.refused, 1, "a refused socket is counted, not only logged");
+    assert.equal(after.maxWs, 2);
+  } finally { await s.close(); }
+});
+
+// The default is off, so a suite that only ever ran with it on would not
+// notice it being reported as a constant.
+test("/stats reports logDesync false when it is off", async () => {
+  const s = await server();
+  try {
+    const j = await (await fetch(`http://127.0.0.1:${s.port}/stats`)).json() as any;
+    assert.equal(j.logDesync, false);
+    assert.equal(j.maxWs, 100, "startServer's own default, which is not the Dockerfile's");
+  } finally { await s.close(); }
+});
+
 test("ws ping keeps a live client connected", async () => {
   const s = await server({ pingMs: 30 });
   try {
@@ -381,7 +422,8 @@ test("after the grace period the match is gone, and welcome says so", async () =
     h.ws.close();
     await h.closed;
     await sleep(250);
-    assert.deepEqual({ ...s.rooms.stats(), connections: 0 }, { connections: 0, rooms: 0, sessions: 0, waiting: 0 });
+    const { rooms, sessions, waiting } = s.rooms.stats();
+    assert.deepEqual({ rooms, sessions, waiting }, { rooms: 0, sessions: 0, waiting: 0 });
     const again = await client(s.port);
     again.send({ t: "hello", v: 1, id: "leaver-0010", name: "l", variant: "test" });
     assert.equal((await again.wait(m => m.t === "welcome")).room, null);

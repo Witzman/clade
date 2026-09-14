@@ -11,6 +11,10 @@
 //   GRACE_MS    reconnect grace period                     (60000)
 //   TURN_MS     the test room's decision clock             (20000)
 //
+// /stats reports every one of these back, alongside the live counts, because
+// a deployed value that can only be read over SSH or by triggering it is not
+// a value anyone can audit (workshop #37, #44).
+//
 // MAX_WS is a ceiling on damage to the HOST, not a guess at demand (workshop
 // #18). This host's Apache is mpm_prefork with MaxRequestWorkers 150, shared
 // with the owner's mail interface and two other sites, and one WebSocket holds
