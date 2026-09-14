@@ -28,7 +28,8 @@ COPY server/package.json ./server/
 RUN cd server && npm install --omit=dev --no-audit --no-fund
 
 COPY server/ ./server/
-COPY web/ ./web/
+# web/ plus its build outputs (render-test bundle, assets/) from the web stage.
+COPY --from=web /build/web/ ./web/
 
 ENV PORT=80 WEB_ROOT=/app/web
 EXPOSE 80
