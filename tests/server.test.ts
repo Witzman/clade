@@ -355,7 +355,7 @@ test("/stats reports logDesync false when it is off", async () => {
   try {
     const j = await (await fetch(`http://127.0.0.1:${s.port}/stats`)).json() as any;
     assert.equal(j.logDesync, false);
-    assert.equal(j.maxWs, 100, "startServer's own default, which is not the Dockerfile's");
+    assert.equal(j.maxWs, 40, "startServer's own default, the same 40 the entrypoint and the Dockerfile use");
   } finally { await s.close(); }
 });
 
