@@ -38,6 +38,11 @@ jobs:
       - name: No engine-dependent maths, clocks or outside imports in core/
         run: bash tests/core-purity.sh core
 
+      # The gate's own test. It has been wrong twice (workshop #35, #43), both
+      # times because nothing exercised it.
+      - name: The gate rejects every spelling it is meant to
+        run: bash tests/core-purity.test.sh
+
   # The genome -> anatomy traits mapping (render/traits.ts, workshop #26).
   # Node 22 strips the types, so the test runs unbuilt.
   render-traits:

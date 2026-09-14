@@ -138,7 +138,7 @@ export type ServerOptions = Partial<Options> & { port: number; webRoot: string }
 export function startServer(o: ServerOptions): Promise<{ port: number; close(): Promise<void>; rooms: ReturnType<typeof createRooms> }> {
   const root = resolve(o.webRoot);
   const rooms = createRooms({
-    maxWs: o.maxWs ?? 100, graceMs: o.graceMs ?? 60000, turnMs: o.turnMs ?? 20000,
+    maxWs: o.maxWs ?? 40, graceMs: o.graceMs ?? 60000, turnMs: o.turnMs ?? 20000,
     pingMs: o.pingMs ?? 25000, logDesync: o.logDesync ?? false, log: o.log ?? console.log,
     computerThinkMs: o.computerThinkMs, keepComputerFrames: o.keepComputerFrames,
   });
