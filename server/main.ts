@@ -190,6 +190,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     turnMs: Number(env.TURN_MS || 20000),
   });
   console.log(`clade server on ${s.port} (MAX_WS=${env.MAX_WS || 100})`);
+  // Last backstop (#34): a bug in one room handler must not end the process
+  // and every match with it. Per-socket and per-room catches live in
+  // rooms.ts; this catches what escapes a timer or a promise.
+  process.on("uncaughtException", e => console.log(`uncaught: ${e instanceof Error ? e.stack ?? e.message : String(e)}`));
+  process.on("unhandledRejection", e => console.log(`unhandled rejection: ${e instanceof Error ? e.stack ?? e.message : String(e)}`));
   // Docker stops a container with SIGTERM. Tell every client before exiting,
   // so a redeploy reads as "interrupted" rather than as a hang.
   for (const sig of ["SIGTERM", "SIGINT"] as const) {

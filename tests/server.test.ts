@@ -276,6 +276,37 @@ test("enter replays the run: a forged hash is refused and logged with LOG_DESYNC
 
 // ---------------------------------------------------------------- limits
 
+test("a variant that is an Object.prototype key is refused, and the server keeps serving", async () => {
+  const s = await server();
+  try {
+    for (const variant of ["constructor", "__proto__", "toString", "valueOf", "hasOwnProperty", "nope"]) {
+      const c = await client(s.port);
+      c.send({ t: "hello", v: 1, id: "qa0123456789", name: "qa", variant });
+      const m = await c.wait(f => f.t === "error" || f.t === "welcome");
+      assert.deepEqual([variant, m.t, m.reason], [variant, "error", "unknown variant"]);
+      c.ws.close();
+    }
+    // A non-string variant must not be coerced into a key either.
+    const weird = await client(s.port);
+    weird.send({ t: "hello", v: 1, id: "qa0123456789", name: "qa", variant: { toString: () => "test" } });
+    assert.equal((await weird.wait(f => f.t === "error")).reason, "unknown variant");
+    weird.ws.close();
+
+    // Still serving: a real match runs to its result on the same process.
+    const a = await player(s.port, "after-a-0001", "person");
+    const b = await player(s.port, "after-b-0002", "person");
+    await Promise.all([a.wait(m => m.t === "matched"), b.wait(m => m.t === "matched")]);
+    for (let r = 0; r < ROUNDS; r++) {
+      await Promise.all([a.wait(m => m.do === "round" && m.round === r), b.wait(m => m.do === "round" && m.round === r)]);
+      a.send({ t: "act", do: "commit", round: r, pick: 1 });
+      b.send({ t: "act", do: "commit", round: r, pick: 2 });
+      await Promise.all([a.wait(m => m.do === "reveal" && m.round === r), b.wait(m => m.do === "reveal" && m.round === r)]);
+    }
+    const [resA, resB] = await Promise.all([a.wait(m => m.t === "result"), b.wait(m => m.t === "result")]);
+    assert.deepEqual(resA, resB);
+  } finally { await s.close(); }
+});
+
 test("MAX_WS refuses the socket beyond the cap with {t:\"full\"}", async () => {
   const s = await server({ maxWs: 2 });
   try {

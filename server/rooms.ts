@@ -52,7 +52,9 @@ const other = (s: Side): Side => (s === 0 ? 1 : 0);
 const token = () => randomBytes(8).toString("hex");
 
 export function createRooms(opts: Options) {
-  const handlers: Record<string, Handler> = { test: testRoom(opts.turnMs) };
+  // A Map, not an object: `handlers["constructor"]` on an object literal is
+  // Object.prototype.constructor, which is truthy and is not a handler (#34).
+  const handlers = new Map<string, Handler>([["test", testRoom(opts.turnMs)]]);
   const rooms = new Map<string, Room>();
   const sessions = new Map<string, Session>();
   const clocks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -83,8 +85,8 @@ export function createRooms(opts: Options) {
     if (room.deadline !== null && rooms.has(room.id) && !stopping) {
       clocks.set(room.id, setTimeout(() => {
         clocks.delete(room.id);
-        const h = handlers[room.variant];
-        if (rooms.has(room.id) && h.tick) dispatch(room, h.tick(room));
+        const h = handlers.get(room.variant);
+        if (rooms.has(room.id) && h?.tick) guard(room, () => dispatch(room, h.tick!(room)));
       }, Math.max(0, room.deadline - Date.now())));
     }
   }
@@ -112,7 +114,7 @@ export function createRooms(opts: Options) {
     [a, b].forEach((s, side) => { s.room = room; s.side = side as Side; });
     [a, b].forEach(s => sendTo(s.conn, matched(room, s.side)));
     opts.log(`room ${room.id} ${room.variant} ${a.id} vs ${b.id}${b.computer ? " (computer)" : ""}`);
-    dispatch(room, handlers[room.variant].start(room));
+    guard(room, () => dispatch(room, handlers.get(room.variant)!.start(room)));
   }
 
   const matched = (room: Room, side: Side) => {
@@ -143,7 +145,32 @@ export function createRooms(opts: Options) {
   }
 
   // ------------------------------------------------------------ inbound
+  // A handler that throws must cost one socket, not the process: three
+  // variants are about to be written against this interface (#34).
   function inbound(conn: Conn, text: string) {
+    try {
+      handle(conn, text);
+    } catch (e) {
+      opts.log(`inbound failed: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+      sendTo(conn, { t: "error", reason: "server error" });
+      conn.close(1011, "server error");
+    }
+  }
+
+  // The same for a room's own clock, which runs on a timer with no socket to
+  // blame: log it and end the room, rather than let the timer throw.
+  function guard(room: Room, fn: () => void) {
+    try {
+      fn();
+    } catch (e) {
+      opts.log(`room ${room.id} failed: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+      const text = JSON.stringify({ t: "error", reason: "server error" });
+      for (const side of [0, 1] as Side[]) sessionOf(room, side)?.conn?.send(text);
+      endRoom(room);
+    }
+  }
+
+  function handle(conn: Conn, text: string) {
     let m: any;
     try { m = JSON.parse(text); } catch { return sendTo(conn, { t: "error", reason: "bad json" }); }
     if (!m || typeof m.t !== "string") return sendTo(conn, { t: "error", reason: "bad message" });
@@ -157,7 +184,7 @@ export function createRooms(opts: Options) {
       case "act": {
         if (!s.room) return sendTo(conn, { t: "error", reason: "not in a match" });
         s.room.lastActive = Date.now();
-        return dispatch(s.room, handlers[s.room.variant].act(s.room, s.side, m));
+        return dispatch(s.room, handlers.get(s.room.variant)!.act(s.room, s.side, m));
       }
       case "leave": return leave(s);
       default: return sendTo(conn, { t: "error", reason: "unknown message" });
@@ -169,7 +196,7 @@ export function createRooms(opts: Options) {
     if (m.v !== 1) return bad("unsupported version");
     if (typeof m.id !== "string" || !ID.test(m.id)) return bad("bad id");
     if (m.id.startsWith("cpu-") !== conn.computer) return bad("bad id");
-    if (!handlers[m.variant]) return bad("unknown variant");
+    if (typeof m.variant !== "string" || !handlers.has(m.variant)) return bad("unknown variant");
     const name = typeof m.name === "string" ? m.name.slice(0, 24) : "";
 
     let s = sessions.get(m.id);
