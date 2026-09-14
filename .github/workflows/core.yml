@@ -38,6 +38,20 @@ jobs:
       - name: No engine-dependent maths, clocks or outside imports in core/
         run: bash tests/core-purity.sh core
 
+  # The genome -> anatomy traits mapping (render/traits.ts, workshop #26).
+  # Node 22 strips the types, so the test runs unbuilt.
+  render-traits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/render-traits.test.ts
+        run: node --test tests/render-traits.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
