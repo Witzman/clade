@@ -89,9 +89,17 @@ export function traits(g: Genome): AnatomyTraits {
   const u: number[] = [];
   for (let a = 0; a < NA; a++) u.push(Math.max(-1, Math.min(1, p.v[a] / V_SAT)));
   const lead = Math.max(0, ...u);
-  // mild emphasis on the leading dimension, so a creature reads as its best
-  // trait first. It never adds a cue that is absent: 0 stays 0.
-  const t = u.map(x => (x > 0 && lead > 0 ? x * (0.65 + 0.35 * (x / lead)) : 0));
+  // Emphasis on the LEADING dimension, so a creature reads as its best trait
+  // first. It never adds a cue that is absent: 0 stays 0, and the leading
+  // dimension is drawn at its full size.
+  //
+  // The curve is square rather than linear (workshop #32). With the linear
+  // one, a secondary dimension at half the lead still drew 41 % of a full cue,
+  // and the most salient cue on this creature -- the dorsal spine row -- won
+  // the read whatever the creature was actually best at: in an 80-creature
+  // blind read, sharp was named 25 times out of 16. Cue salience has to follow
+  // magnitude, or the picture answers a question nobody asked.
+  const t = u.map(x => (x > 0 && lead > 0 ? x * (0.30 + 0.70 * (x / lead) * (x / lead)) : 0));
   const n = u.map(x => Math.max(0, -x)); // real deficiencies
   const [tM, tR, tE, tT, tS] = [t[M], t[R], t[E], t[T], t[S]];
 
