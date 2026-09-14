@@ -52,3 +52,11 @@ jobs:
 
       - name: tsc --noEmit
         run: npx tsc --noEmit
+
+      # render/ and web/ run in the browser: typed against the DOM, and bundled
+      # exactly as the Dockerfile's web stage bundles them.
+      - name: tsc --noEmit (browser code)
+        run: npx tsc --noEmit -p tsconfig.web.json
+
+      - name: Browser bundle builds
+        run: npm run build:web

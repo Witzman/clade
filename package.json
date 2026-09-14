@@ -6,7 +6,8 @@
   "scripts": {
     "test:determinism": "node tests/determinism.test.ts",
     "test:purity": "bash tests/core-purity.sh core",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
+    "build:web": "esbuild web/render-test/main.ts --bundle --format=esm --target=es2020,safari15 --outfile=web/render-test/main.js && rm -rf web/assets && cp -R assets web/assets"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
