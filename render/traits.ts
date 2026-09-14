@@ -50,7 +50,7 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const clampInt = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(x)));
 
 // head form -> [length, depth, gape]: biting jaws, beak, heavy jaw, long snout, rasping tongue
-const HEAD_BASE = [[0.35, 0.50, 0.45], [0.55, 0.30, 0.10], [0.25, 0.75, 0.35], [0.65, 0.30, 0.20], [0.20, 0.55, 0.15]];
+const HEAD_BASE = [[0.32, 0.50, 0.45], [0.40, 0.30, 0.10], [0.26, 0.75, 0.35], [0.44, 0.30, 0.20], [0.24, 0.55, 0.15]];
 // body form -> [leg count, splay, core length, core height, limb length, tail length, tail count]
 // two legs, four legs, long body, spoke body, wings
 const BODY_BASE = [
@@ -113,7 +113,7 @@ export function traits(g: Genome): AnatomyTraits {
 
   // --- 3. head --------------------------------------------------------------
   let length = hLen + 0.50 * rHead + (weapon === WEAPON_FANGS ? 0.40 * rWeapon : 0) - 0.20 * n[R];
-  length = Math.max(length, hLen + 0.45 * tR); // the snout always carries at least half the reach
+  length = Math.max(length, hLen + 0.60 * tR); // the snout always carries most of the reach
   const horn = weapon === WEAPON_HORN || weapon === WEAPON_TUSKS
     ? (weapon === WEAPON_TUSKS ? 0.8 : 1) * eWeapon + 0.5 * rWeapon : 0;
   const head = {
@@ -153,7 +153,7 @@ export function traits(g: Genome): AnatomyTraits {
     height: clamp01(0.45 + bCoreH + frH + 0.45 * tM - 0.32 * tT - 0.25 * tS - 0.20 * n[M]),
     segments: clampInt(2 + 7 * tS + frSeg, 2, 9),
     // low base: plates draw only above 0.35, so only real armour draws them
-    chitin: clamp01(0.15 + 0.85 * tS - 0.25 * n[S] + skChitin + frChitin),
+    chitin: clamp01(0.10 + 0.90 * tS - 0.25 * n[S] + 0.6 * (skChitin + frChitin)),
     dorsal: clamp01(dorsal),
     hunch: clamp01(0.05 + 0.75 * tS - 0.35 * tT + frHunch),
   };
@@ -166,7 +166,7 @@ export function traits(g: Genome): AnatomyTraits {
   if (weapon === WEAPON_SPURS && eWeapon > 0.3) foot = Math.min(foot, 0.2);
   const limbs = {
     count: bCount,
-    length: clamp01(0.50 + bLimbLen + 0.30 * rLimb + 0.45 * tT - 0.50 * tS - 0.15 * n[T]),
+    length: clamp01(0.50 + bLimbLen + 0.15 * rLimb + 0.45 * tT + 0.20 * tM - 0.50 * tS - 0.15 * n[T]),
     joints,
     thickness: clamp01(0.35 + 0.55 * tM - 0.40 * tT - 0.15 * n[M] + 0.10 * n[T]),
     foot: clamp01(foot),
