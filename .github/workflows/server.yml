@@ -26,6 +26,12 @@ jobs:
       - name: Server tests (real sockets, in process)
         run: node --test tests/server.test.ts
 
+      # The alarm (workshop #39, #18). Includes a real STARTTLS + AUTH PLAIN
+      # conversation against a throwaway relay, so the hand-rolled SMTP client
+      # is not something only the production relay has ever exercised.
+      - name: Alarm tests (rules, and a real SMTP conversation)
+        run: node --test tests/alert.test.ts
+
   image:
     runs-on: ubuntu-latest
     steps:

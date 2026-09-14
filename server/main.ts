@@ -15,6 +15,21 @@
 // a deployed value that can only be read over SSH or by triggering it is not
 // a value anyone can audit (workshop #37, #44).
 //
+// The alarm (workshop #39, #18). With no ALERT_SMTP_HOST / ALERT_TO every
+// rule still runs and every alert is still written to stdout; only delivery
+// is off. Nothing here names a host -- this one is temporary.
+//
+//   ALERT_SMTP_HOST  relay to post through            (unset = log only)
+//   ALERT_SMTP_PORT  587
+//   ALERT_SMTP_USER  ALERT_SMTP_PASS   AUTH PLAIN credentials
+//   ALERT_FROM       envelope and header sender
+//   ALERT_TO         comma-separated recipients       (unset = log only)
+//   ALERT_NAME       which deployment this is: staging, production
+//   ALERT_POLL_MS    how often the rules run                     (15000)
+//   ALERT_WS_WARN    warn at this fraction of MAX_WS             (0.8)
+//   ALERT_MEM_MB     cgroup memory alarm, MB                     (0 = off)
+//   ALERT_REPEAT_MS  a firing alert re-sends at most this often  (3600000)
+//
 // MAX_WS is a ceiling on damage to the HOST, not a guess at demand (workshop
 // #18). This host's Apache is mpm_prefork with MaxRequestWorkers 150, shared
 // with the owner's mail interface and two other sites, and one WebSocket holds
@@ -31,6 +46,9 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { createRooms } from "./rooms.ts";
 import type { Options } from "./rooms.ts";
+import { createAlerter, envConfig } from "./alert.ts";
+import { cgroupMemory, createWatch, startWatch } from "./watch.ts";
+import type { Snapshot } from "./watch.ts";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -202,6 +220,42 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     turnMs: Number(env.TURN_MS || 20000),
   });
   console.log(`clade server on ${s.port} (MAX_WS=${env.MAX_WS || 40})`);
+
+  // ---- the alarm (workshop #39, #18). See server/alert.ts for why the
+  // server alerts on itself rather than being polled from outside.
+  const maxWs = Number(env.MAX_WS || 40);
+  const alerter = createAlerter(envConfig(env, l => console.log(l)));
+  const watch = createWatch(alerter, {
+    maxWs,
+    warnFraction: Number(env.ALERT_WS_WARN || 0.8),
+    memLimitBytes: Number(env.ALERT_MEM_MB || 0) * 1048576,
+    memory: cgroupMemory,
+    log: l => console.log(l),
+  });
+
+  // ONE MAIL PER START, and it is not a courtesy. An expected start is two
+  // seconds of the owner's attention; an UNEXPECTED one is a crash report,
+  // and a crash LOOP is a stream of them. That is how "the process died" gets
+  // a seconds-scale alarm without any external watcher -- which matters,
+  // because the only external watcher this project has fires every 2-5 h
+  // (#39, measured). Docker restarts the container; the restarted process
+  // tells someone it happened.
+  await alerter.event(
+    "start",
+    `server started (MAX_WS=${maxWs}, warn at ${watch.warnAt})`,
+    [
+      `node       : ${process.version}`,
+      `port       : ${s.port}`,
+      `MAX_WS     : ${maxWs}`,
+      `warn at    : ${watch.warnAt} connections`,
+      `poll       : every ${Number(env.ALERT_POLL_MS || 15000)} ms`,
+      "",
+      "If you did not just deploy, this is a crash report: the container",
+      "restarted. Several of these in a row is a crash loop.",
+    ].join("\n"),
+  );
+  startWatch(watch, () => s.rooms.stats() as Snapshot, Number(env.ALERT_POLL_MS || 15000));
+
   // Last backstop (#34): a bug in one room handler must not end the process
   // and every match with it. Per-socket and per-room catches live in
   // rooms.ts; this catches what escapes a timer or a promise.
