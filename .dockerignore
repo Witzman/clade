@@ -1,0 +1,5 @@
+node_modules
+.git
+notes
+web/**/main.js
+web/assets

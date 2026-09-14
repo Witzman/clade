@@ -1,0 +1,53 @@
+name: server
+
+# The server skeleton and the image staging runs. Workshop issue #25.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Browser bundles build
+        run: npm run build:web
+
+      - name: Server tests (real sockets, in process)
+        run: node --test tests/server.test.ts
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t clade .
+
+      - name: The container answers what staging's checks ask
+        run: |
+          set -u
+          docker run -d --name clade -p 8080:80 clade
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1 && break
+            sleep 1
+          done
+          body=$(curl -sS http://127.0.0.1:8080/healthz)
+          [ "$body" = "ok" ] || { echo "::error::/healthz body '$body'"; docker logs clade; exit 1; }
+          for p in / /a/ /b/ /c/ /test-room/ /test-room/main.js /render-test/ /render-test/main.js /assets/materials/fur.png; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$p")
+            echo "$p $code"
+            [ "$code" = "200" ] || { echo "::error::$p answered $code"; docker logs clade; exit 1; }
+          done
+          docker stop -t 5 clade
+          docker logs clade

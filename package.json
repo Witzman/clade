@@ -2,16 +2,22 @@
   "name": "clade",
   "private": true,
   "type": "module",
-  "description": "Clade. Shared core, tests and build tooling. The Sprint 1 probe keeps its own package in server/.",
+  "description": "Clade. Shared core, server, renderer, tests and build tooling.",
   "scripts": {
+    "start": "node server/main.ts",
+    "build:web": "esbuild \"web/**/main.ts\" --bundle --format=esm --target=es2020,safari15 --outdir=web --outbase=web --log-level=warning && rm -rf web/assets && cp -R assets web/assets",
     "test:determinism": "node tests/determinism.test.ts",
     "test:purity": "bash tests/core-purity.sh core",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json",
-    "build:web": "esbuild web/render-test/main.ts --bundle --format=esm --target=es2020,safari15 --outfile=web/render-test/main.js && rm -rf web/assets && cp -R assets web/assets"
+    "test:server": "node --test tests/server.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
   }
 }

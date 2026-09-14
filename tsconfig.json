@@ -1,8 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
-    "types": ["node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -12,5 +16,9 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["core", "tests"]
+  "include": [
+    "core",
+    "server",
+    "tests"
+  ]
 }

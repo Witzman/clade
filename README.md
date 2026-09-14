@@ -31,8 +31,16 @@ CI enforces that rather than trusting it:
 | golden hashes under V8 and JavaScriptCore | `node tests/determinism.test.ts` · `bun tests/determinism.test.ts` |
 | no engine-dependent maths, clocks or outside imports in `core/` | `bash tests/core-purity.sh` |
 | types | `npm ci && npx tsc --noEmit` |
+| the server: static files, `/healthz`, rooms, hidden commits, the computer seat, reconnect, `MAX_WS` | `node --test tests/server.test.ts` |
 
-Node 22 runs the TypeScript directly; nothing needs building to run the tests.
+Node 22 runs the TypeScript directly; nothing needs building to run the tests
+or the server (`node server/main.ts`, configured by `PORT`, `WEB_ROOT`,
+`MAX_WS`, `LOG_DESYNC`, `GRACE_MS`, `TURN_MS`). Browser pages are bundled with
+`npm run build:web`, which turns every `web/**/main.ts` into a `main.js` beside it
+and copies `assets/` under `web/`;
+the Docker image does this in its build stage.
+
+`/test-room/` is a throwaway room for exercising the server, not a game.
 
 ## Reporting a problem
 
