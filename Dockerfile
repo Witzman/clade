@@ -1,42 +1,35 @@
-# The Sprint 1 probe. Workshop issue #14.
+# The game server. Workshop issues #25, #27; technical plan §8.3.
 #
-# Replaces the nginx placeholder because a static server cannot hold a
-# connection, and issues #15 and #16 are about what happens to connections.
-# Still serves web/ so the uptime check and the placeholder page keep working.
-#
-# DISPOSABLE. Not a decision about the runtime -- see server/index.js.
+# One image, one Node process: static files for every page, /healthz, and the
+# WebSocket at /ws. The server runs its TypeScript unbuilt (Node 22 strips
+# types); only browser code is bundled.
 
-# Browser bundles. esbuild turns render/ + web/**/main.ts into plain JS, and the
-# credited assets are copied under web/ so the static server can reach them.
-# A separate stage, so the dev dependencies never reach the running image.
-# Workshop issue #27.
+# ---- web: esbuild turns every web/**/main.ts (with core/, render/ and the
+# server's shared test-room rules) into main.js beside it, and copies the
+# credited assets under web/ so the static server can reach them. A separate
+# stage, so the dev dependencies never reach the running image.
 FROM node:22-alpine AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY core/ ./core/
-COPY render/ ./render/
-COPY assets/ ./assets/
-COPY web/ ./web/
+COPY . .
 RUN npm run build:web
 
+# ---- runtime: `ws` is the only dependency
 FROM node:22-alpine
-
 WORKDIR /app
-
-# Dependencies first, so a change to the source does not reinstall them.
-COPY server/package.json ./server/
-RUN cd server && npm install --omit=dev --no-audit --no-fund
-
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+COPY core/ ./core/
 COPY server/ ./server/
-# web/ plus its build outputs (render-test bundle, assets/) from the web stage.
 COPY --from=web /build/web/ ./web/
 
-ENV PORT=80 WEB_ROOT=/app/web
+ENV PORT=80 WEB_ROOT=/app/web MAX_WS=100
 EXPOSE 80
 
 # wget is in busybox on alpine, so the healthcheck needs nothing installed.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1/healthz | grep -q ok || exit 1
 
-CMD ["node", "server/index.js"]
+# exec form, so node is PID 1 and receives Docker's SIGTERM on a redeploy.
+CMD ["node", "server/main.ts"]
