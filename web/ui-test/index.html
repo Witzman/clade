@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI test</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --paper: rgb(232,226,211); --ink: rgb(26,22,20); }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; padding-top: 64px; background: var(--paper); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; }
+  .note { margin: 0 0 12px; max-width: 70ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  button, a.btn { font: inherit; padding: 8px 14px; min-height: 44px; border: 1px solid var(--ink);
+           background: #fff; color: var(--ink); border-radius: 6px; cursor: pointer; text-decoration: none;
+           display: inline-flex; align-items: center; touch-action: manipulation; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  #picked, #fielded { min-height: 1.4em; margin: 8px 0 0; }
+  #error { color: rgb(168,40,30); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>UI test</h1>
+  <p class="note">The shared creature card, birth lines, herd grid and how-to overlay, drawn from genomes the
+    core founds and breeds from the seed below. Nothing here is a game rule.</p>
+  <div class="bar">
+    <button type="button" id="howto">How to play</button>
+    <a class="btn" id="reroll" href="?">New set</a>
+    <span id="seedinfo"></span>
+  </div>
+  <p id="error" hidden></p>
+
+  <h2>Cards, 128 px: two founders, their litter of three, one captured</h2>
+  <div class="row" id="cards"></div>
+
+  <h2>Herd grid: pick two</h2>
+  <div id="herd"></div>
+  <p id="picked" aria-live="polite">Picked: none</p>
+
+  <h2>Litter grid: pick one</h2>
+  <div id="litter"></div>
+  <p id="fielded" aria-live="polite">Picked: none</p>
+
+  <h2>Small cards, 48 px and 32 px (silhouettes)</h2>
+  <div class="row" id="small"></div>
+</main>
+<script type="module" src="/ui-test/main.js"></script>
+</body>
+</html>

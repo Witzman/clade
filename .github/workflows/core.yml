@@ -101,6 +101,20 @@ jobs:
       - name: node --test tests/fight-events.test.ts
         run: node --test tests/fight-events.test.ts
 
+  # The shared presentation (ui/, workshop #61): every fusion record the core
+  # can produce gives a real birth sentence, and the counters wording is exact.
+  ui-birth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/ui-birth.test.ts
+        run: node --test tests/ui-birth.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
