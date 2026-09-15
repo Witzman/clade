@@ -64,6 +64,12 @@ p { margin: 0 0 10px; }
 .a-herd .clade-cell { justify-content: stretch; }
 .a-litter .clade-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .a-pair { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; min-height: 60px; margin: 6px 0 0; }
+.a-pair:empty { display: none; }
+.a-sticky { position: sticky; top: 0; z-index: 5; margin: 8px 0; padding: 8px 0; background: ${css(PAPER)}; }
+.a-section-title { margin-top: 24px; }
+.a-fighters { display: flex; flex-wrap: wrap; gap: 8px 12px; max-width: 640px; margin: 0 0 12px; }
+.a-fighters > div { flex: 1 1 250px; min-width: 0; }
+.a-fighters .clade-card { width: 100%; }
 .a-div { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .a-panel { padding: 12px; border-radius: 10px; background: ${css(INK, 0.04)}; border: 1px solid ${css(INK, 0.1)}; margin: 0 0 16px; }
 .a-outcome { font-size: 18px; font-weight: 650; margin: 8px 0 6px; }
@@ -334,9 +340,9 @@ function fieldScreen(m: Match): void {
     scoreBar(m),
     h('h2', { text: 'The young' }),
     h('p', { class: 'a-soft', text: "Both litters are shown to both players. Choose one of your young to fight; the computer chooses at the same time. The other two are released." }),
-    h('div', { class: 'a-actions' }, go, thinking),
+    h('div', { class: 'a-actions a-sticky' }, go, thinking),
     h('div', { class: 'a-cols' }, sec('Your young', mine, 'mine', 'human'), sec("The computer's young", theirs, 'theirs', 'computer')),
-    h('h3', { text: 'Herds' }),
+    h('h3', { class: 'a-section-title', text: 'Herds' }),
     herdsSection(m),
   );
 }
@@ -356,6 +362,9 @@ function fightScreen(m: Match): void {
   show('fight',
     bar,
     h('h2', { text: `Round ${r.round}: the fight` }),
+    h('div', { class: 'a-fighters' },
+      h('div', {}, h('h3', { text: 'Your fighter' }), creatureCard(a, { size: 48, tag: 'young' }).element),
+      h('div', {}, h('h3', { text: "The computer's fighter" }), creatureCard(b, { size: 48, tag: 'young' }).element)),
     stage, after,
   );
   const rp = mountReplay(stage, rec, { names: { A: nameA, B: nameB }, stepMs: replayStepMs(actions) });
