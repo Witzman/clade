@@ -38,7 +38,22 @@ export type Outbound = { to: Side | "both"; msg: { t: string; [k: string]: unkno
 //           that expired
 export type SeatEvent = "gone" | "back" | "left";
 
+// What a handler's `enter` decides about a player's claimed run. `reply` is
+// spread into the {t:"accepted", do:"enter"} frame. `desync` is the detail the
+// server logs (with the identity and user agent) when LOG_DESYNC is on.
+export type Entry =
+  | { herd: Genome[]; reply: Record<string, unknown> }
+  | { reason: string; desync?: string };
+
 export type Handler = {
+  // The variant owns its entry (build plan A3). A handler with `enter` verifies
+  // a run before its player may queue, and the verified herd becomes
+  // Player.herd. A handler without it has no run: its players queue directly,
+  // Player.herd is empty, and the room deals from its own seed.
+  enter?(msg: any): Entry;
+  // True when the server may seat a computer opponent (the test room's seat).
+  // Without it, {vs:"computer"} is refused.
+  computer?: boolean;
   // Amended from plan §6.3 (which returns void): the first round has to be
   // announced, so start returns what to send.
   start(room: Room): Outbound[];

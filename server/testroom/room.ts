@@ -12,7 +12,7 @@
 import { rng, int, breed, express, stats, fight, fightResult } from "../../core/index.ts";
 import type { Genome } from "../../core/index.ts";
 import type { Handler, Outbound, Room, Side } from "../types.ts";
-import { fnv, hex8, toHex } from "./run.ts";
+import { fnv, hex8, toHex, checkDecisions, replay } from "./run.ts";
 
 export const ROUNDS = 3;
 
@@ -93,6 +93,26 @@ function reveal(room: Room): Outbound[] {
 
 export function testRoom(turnMs: number): Handler {
   return {
+    computer: true,
+
+    // The test room's entry: replay the claimed run and compare its hash. Moved
+    // here unchanged from rooms.ts, so the server no longer assumes every
+    // variant has a run (build plan A3).
+    enter(msg) {
+      const decisions = checkDecisions(msg.decisions);
+      if (!Number.isInteger(msg.runSeed) || msg.runSeed < 0 || msg.runSeed > 0xffffffff || !decisions
+          || typeof msg.stateHash !== "string")
+        return { reason: "bad run" };
+      const t0 = performance.now();
+      const run = replay(msg.runSeed, decisions);
+      const ms = (performance.now() - t0).toFixed(1);
+      if (run.hash !== msg.stateHash) {
+        return { reason: "desync", desync: `runSeed=${msg.runSeed} decisions=${decisions.length} ` +
+                 `client=${msg.stateHash.slice(0, 16)} server=${run.hash} replay=${ms}ms` };
+      }
+      return { herd: run.herd, reply: { hash: run.hash, replayMs: Number(ms) } };
+    },
+
     start(room) {
       room.state = { round: 0, current: null, wins: [0, 0], history: [], done: false, turnMs,
                      paused: null } as unknown as State;

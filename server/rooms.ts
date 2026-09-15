@@ -14,7 +14,8 @@ import type { Genome } from "../core/index.ts";
 import type { Handler, Outbound, Room, SeatEvent, Side } from "./types.ts";
 import { RESULT } from "./types.ts";
 import { testRoom } from "./testroom/room.ts";
-import { checkDecisions, replay, toHex } from "./testroom/run.ts";
+import { toHex } from "./testroom/run.ts";
+import { aRoom, BREED_MS, FIELD_MS } from "./a/room.ts";
 import { computerSeat } from "./testroom/computer.ts";
 import type { Seat } from "./testroom/computer.ts";
 
@@ -27,6 +28,7 @@ export type Options = {
   log: (line: string) => void;
   computerThinkMs?: [number, number];
   keepComputerFrames?: boolean;
+  aClockMs?: [number, number]; // variant A's breed and field clocks (45 s, 20 s)
 };
 
 type Conn = {
@@ -54,7 +56,10 @@ const token = () => randomBytes(8).toString("hex");
 export function createRooms(opts: Options) {
   // A Map, not an object: `handlers["constructor"]` on an object literal is
   // Object.prototype.constructor, which is truthy and is not a handler (#34).
-  const handlers = new Map<string, Handler>([["test", testRoom(opts.turnMs)]]);
+  const handlers = new Map<string, Handler>([
+    ["test", testRoom(opts.turnMs)],
+    ["a", aRoom({ breedMs: opts.aClockMs?.[0], fieldMs: opts.aClockMs?.[1] })],
+  ]);
   const rooms = new Map<string, Room>();
   const sessions = new Map<string, Session>();
   const clocks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -134,7 +139,7 @@ export function createRooms(opts: Options) {
   function match(a: Session, b: Session) {
     const room: Room = {
       id: token(), variant: a.variant, seed: randomInt(0, 2 ** 32 - 1) >>> 0,
-      players: [a, b].map(s => ({ id: s.id, name: s.name, herd: s.herd!, computer: s.computer })) as Room["players"],
+      players: [a, b].map(s => ({ id: s.id, name: s.name, herd: s.herd ?? [], computer: s.computer })) as Room["players"],
       state: null, lastActive: Date.now(), deadline: null,
     };
     rooms.set(room.id, room);
@@ -257,30 +262,28 @@ export function createRooms(opts: Options) {
     }
   }
 
+  // The variant owns its entry (Handler.enter). A variant with no run has no
+  // entry to make: it queues directly.
   function enter(s: Session, m: any) {
     if (s.room) return sendTo(s.conn, { t: "error", reason: "in a match" });
-    const decisions = checkDecisions(m.decisions);
-    if (!Number.isInteger(m.runSeed) || m.runSeed < 0 || m.runSeed > 0xffffffff || !decisions
-        || typeof m.stateHash !== "string")
-      return sendTo(s.conn, { t: "error", reason: "bad run" });
-    const t0 = performance.now();
-    const run = replay(m.runSeed, decisions);
-    const ms = (performance.now() - t0).toFixed(1);
-    if (run.hash !== m.stateHash) {
-      if (opts.logDesync) {
-        opts.log(`DESYNC id=${s.id} runSeed=${m.runSeed} decisions=${decisions.length} ` +
-                 `client=${m.stateHash.slice(0, 16)} server=${run.hash} replay=${ms}ms ua=${JSON.stringify(s.conn?.ua)}`);
+    const h = handlers.get(s.variant)!;
+    if (!h.enter) return sendTo(s.conn, { t: "error", reason: "no entry" });
+    const e = h.enter(m);
+    if ("reason" in e) {
+      if (e.desync !== undefined) {
+        if (opts.logDesync) opts.log(`DESYNC id=${s.id} ${e.desync} ua=${JSON.stringify(s.conn?.ua)}`);
+        s.herd = null;
       }
-      s.herd = null;
-      return sendTo(s.conn, { t: "error", reason: "desync" });
+      return sendTo(s.conn, { t: "error", reason: e.reason });
     }
-    s.herd = run.herd;
-    sendTo(s.conn, { t: "accepted", do: "enter", hash: run.hash, replayMs: Number(ms) });
+    s.herd = e.herd;
+    sendTo(s.conn, { t: "accepted", do: "enter", ...e.reply });
   }
 
   function queue(s: Session, m: any) {
     if (s.room) return sendTo(s.conn, { t: "error", reason: "in a match" });
-    if (!s.herd) return sendTo(s.conn, { t: "error", reason: "enter first" });
+    const h = handlers.get(s.variant)!;
+    if (h.enter && !s.herd) return sendTo(s.conn, { t: "error", reason: "enter first" });
     s.level = Number.isInteger(m.level) ? m.level : 0;
     dequeue(s);
 
@@ -291,6 +294,7 @@ export function createRooms(opts: Options) {
       return match(human, s);
     }
     if (m.vs === "computer") {
+      if (!h.computer) return sendTo(s.conn, { t: "error", reason: "no computer seat" });
       sendTo(s.conn, { t: "accepted", do: "queued", vs: "computer" });
       return seatComputer(s);
     }
@@ -387,7 +391,8 @@ export function createRooms(opts: Options) {
     stats: () => ({ connections: wss.clients.size, rooms: rooms.size, sessions: sessions.size,
                     waiting: waiting.length, refused,
                     maxWs: opts.maxWs, graceMs: opts.graceMs, turnMs: opts.turnMs,
-                    logDesync: opts.logDesync }),
+                    logDesync: opts.logDesync,
+                    aClockMs: [opts.aClockMs?.[0] ?? BREED_MS, opts.aClockMs?.[1] ?? FIELD_MS] }),
     seats,
     // A redeploy: every client is told, then closed with 1012 (service restart).
     shutdown() {

@@ -159,6 +159,7 @@ export function startServer(o: ServerOptions): Promise<{ port: number; close(): 
     maxWs: o.maxWs ?? 40, graceMs: o.graceMs ?? 60000, turnMs: o.turnMs ?? 20000,
     pingMs: o.pingMs ?? 25000, logDesync: o.logDesync ?? false, log: o.log ?? console.log,
     computerThinkMs: o.computerThinkMs, keepComputerFrames: o.keepComputerFrames,
+    aClockMs: o.aClockMs,
   });
 
   const server = createServer((req, res) => {
