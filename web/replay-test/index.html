@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replay test</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --paper: rgb(232,226,211); --ink: rgb(26,22,20); }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--paper); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; }
+  .note { margin: 0 0 12px; max-width: 70ch; }
+  pre { background: #fff; border: 1px solid rgba(0,0,0,.15); padding: 10px; overflow-x: auto;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+  button, a.btn { font: inherit; padding: 8px 14px; min-height: 44px; border: 1px solid var(--ink);
+           background: #fff; color: var(--ink); border-radius: 4px; cursor: pointer; text-decoration: none;
+           display: inline-flex; align-items: center; touch-action: manipulation; }
+  button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  #stage { background: #fff; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; padding: 12px; max-width: 666px; }
+  #error { color: rgb(168,40,30); font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Replay test</h1>
+  <p class="note">Fights between creatures bred by the game's core from the seed below, replayed one action at a
+    time. Pick a short, a typical or a long fight. The check underneath resolves fights in this browser and
+    compares the replay's events with the core's result, bit for bit.</p>
+  <div class="bar">
+    <button type="button" data-pick="short">Short</button>
+    <button type="button" data-pick="median">Typical</button>
+    <button type="button" data-pick="long">Long</button>
+    <button type="button" id="again">Replay again</button>
+    <a class="btn" id="reroll" href="?">New seed</a>
+  </div>
+  <p id="seedinfo" class="note"></p>
+  <p id="error" hidden></p>
+  <div id="stage"></div>
+
+  <h2>Check in this browser</h2>
+  <pre id="check">running…</pre>
+
+  <script type="module" src="/replay-test/main.js"></script>
+</body>
+</html>
