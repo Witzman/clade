@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio test</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --paper: rgb(232,226,211); --ink: rgb(26,22,20); --accent: rgb(222,86,52); }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--paper); color: var(--ink);
+         font: 14px/1.4 system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; }
+  .note { margin: 0 0 12px; max-width: 70ch; }
+  button { font: inherit; padding: 8px 12px; min-height: 44px; border: 1px solid var(--ink);
+           background: #fff; color: var(--ink); border-radius: 4px; cursor: pointer; touch-action: manipulation; }
+  button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  input[type=range] { width: 140px; }
+  #meter { width: 220px; height: 14px; background: #fff; border: 1px solid rgba(0,0,0,.2); position: relative; }
+  #meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; }
+  pre { background: #fff; border: 1px solid rgba(0,0,0,.15); padding: 10px; overflow-x: auto;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+</style>
+</head>
+<body>
+  <h1>Audio test</h1>
+  <p class="note">The shared cue set and music beds, synthesised in the browser. Nothing sounds until the first
+    tap. "Check every cue" plays each one and reads its peak level off the output, so a silent cue is visible
+    without listening.</p>
+
+  <div class="bar">
+    <button id="start" class="primary">Start audio</button>
+    <button id="mute" aria-pressed="false">Mute</button>
+    <button id="music-on" aria-pressed="true">Music on</button>
+    <label>Volume <input id="volume" type="range" min="0" max="1" step="0.01"></label>
+    <span id="meter" title="output peak"><i></i></span> <span id="db">–∞ dB</span>
+  </div>
+
+  <h2>Cues</h2>
+  <div class="bar">
+    <label>Intensity <input id="intensity" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+    <label>Pan <input id="pan" type="range" min="-1" max="1" step="0.1" value="0"></label>
+  </div>
+  <div class="grid" id="cues"></div>
+
+  <h2>Music</h2>
+  <div class="bar" id="beds"><button data-bed="">Stop</button></div>
+
+  <h2>Checks</h2>
+  <div class="bar">
+    <button id="check-all">Check every cue</button>
+    <button id="check-muted">Check muted is silent</button>
+    <button id="stress">Burst: 8 players</button>
+    <button id="bench">Offline render cost</button>
+  </div>
+  <pre id="state"></pre>
+  <pre id="results">no checks run</pre>
+
+  <script type="module" src="/audio-test/main.js"></script>
+</body>
+</html>

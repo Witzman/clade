@@ -11,6 +11,7 @@
     "test:purity-gate": "bash tests/core-purity.test.sh",
     "test:server": "node --test tests/server.test.ts",
     "test:alert": "node --test tests/alert.test.ts",
+    "test:audio": "node --test tests/audio.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.web.json"
   },
   "devDependencies": {
