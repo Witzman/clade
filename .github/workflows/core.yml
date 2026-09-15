@@ -86,6 +86,21 @@ jobs:
       - name: node --test tests/a-rules.test.ts
         run: node --test tests/a-rules.test.ts
 
+  # The replay's fight events (ui/fight-events.ts, workshop #60) copy core's
+  # strike split outside core/. This keeps the copy equal to core.fight() bit
+  # for bit over 9000 random fights.
+  fight-events:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/fight-events.test.ts
+        run: node --test tests/fight-events.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
