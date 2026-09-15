@@ -71,6 +71,21 @@ jobs:
       - name: node --test tests/audio.test.ts
         run: node --test tests/audio.test.ts
 
+  # Variant A's rules and computer (server/a/, workshop #59), and the core
+  # scorer and divergence they read. Prints the snowball figure to compare
+  # with the measured mirror-deal figure; above 75 % fails.
+  a-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/a-rules.test.ts
+        run: node --test tests/a-rules.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

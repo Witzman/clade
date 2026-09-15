@@ -34,3 +34,5 @@ export type { FightState } from "./fight.ts";
 export { breed, founder } from "./breed.ts";
 export type { Fusion } from "./breed.ts";
 export { label } from "./label.ts";
+export { score, hit } from "./score.ts";
+export { divergence } from "./divergence.ts";
