@@ -50,7 +50,7 @@ jobs:
           done
           body=$(curl -sS http://127.0.0.1:8080/healthz)
           [ "$body" = "ok" ] || { echo "::error::/healthz body '$body'"; docker logs clade; exit 1; }
-          for p in / /a/ /b/ /c/ /test-room/ /test-room/main.js /render-test/ /render-test/main.js /audio-test/ /audio-test/main.js /replay-test/ /replay-test/main.js /ui-test/ /ui-test/main.js /assets/materials/fur.png; do
+          for p in / /a/ /a/main.js /b/ /c/ /test-room/ /test-room/main.js /render-test/ /render-test/main.js /audio-test/ /audio-test/main.js /replay-test/ /replay-test/main.js /ui-test/ /ui-test/main.js /assets/materials/fur.png; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$p")
             echo "$p $code"
             [ "$code" = "200" ] || { echo "::error::$p answered $code"; docker logs clade; exit 1; }

@@ -115,6 +115,21 @@ jobs:
       - name: node --test tests/ui-birth.test.ts
         run: node --test tests/ui-birth.test.ts
 
+  # Variant A's tier 1 client session (web/a/session.ts, workshop #62): a stored
+  # match resumes to the same state and screen, and corrupt or edited storage is
+  # refused rather than thrown.
+  a-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/a-client.test.ts
+        run: node --test tests/a-client.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
