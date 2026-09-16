@@ -26,6 +26,11 @@ jobs:
       - name: Server tests (real sockets, in process)
         run: node --test tests/server.test.ts
 
+      # Variant A's two-person room (workshop #64): a full match, no commit
+      # before its reveal, the clock's random picks, the forfeit rule.
+      - name: Variant A room tests (real sockets, in process)
+        run: node --test tests/a-room.test.ts
+
       # The alarm (workshop #39, #18). Includes a real STARTTLS + AUTH PLAIN
       # conversation against a throwaway relay, so the hand-rolled SMTP client
       # is not something only the production relay has ever exercised.
