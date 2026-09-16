@@ -167,7 +167,7 @@ function bar(r: Run): HTMLElement {
     button('Menu', menu, { id: 'menu' }),
     h('span', { text: r.phase === 'over' ? 'The route is behind you' : `Stop ${stop} of ${STOPS}` }),
     h('span', { class: 'b-count', text: `Your herd ${r.exps[PLAYER].herd.length}` }),
-    h('span', { class: 'b-soft', text: isCrossing(stop) ? 'a crossing' : `this stop takes ${LIMIT_WORDS[limit(r)]}` }),
+    h('span', { class: 'b-soft', text: `${isCrossing(stop) ? 'a crossing, ' : 'this stop '}takes ${LIMIT_WORDS[limit(r)]}` }),
   );
 }
 
@@ -185,7 +185,7 @@ function routeStrip(r: Run): HTMLElement {
       h('span', { class: 'b-stop-lim', text: known ? LIMIT_WORDS[ahead[k - at]] : '·' }));
     cell.dataset.stop = String(k);
     if (isCrossing(k)) cell.dataset.crossing = '1';
-    if (k < at) cell.dataset.past = '1';
+    if (k < at || r.phase === 'over') cell.dataset.past = '1';
     if (k === at && r.phase !== 'over') cell.dataset.now = '1';
     cell.title = isCrossing(k) ? `Stop ${k}: a crossing` : `Stop ${k}`;
     strip.append(cell);
@@ -321,7 +321,7 @@ function foundersScreen(r: Run): void {
     h('p', { text: `Three of these ${DEAL} come with you. The rest stay behind. Watch the limits on the road ahead — you will need the sizes they ask for.` }),
     routeStrip(r),
     h('div', { class: 'b-actions b-sticky' }, go, hint),
-    h('section', { class: 'b-deal b-reveal' }, grid.element),
+    h('section', { class: 'b-deal' }, grid.element),
   );
 }
 
@@ -389,7 +389,6 @@ function keepScreen(r: Run): void {
     h('p', { class: 'b-soft', text: `${LITTER} were born. Keep one — the other two are released.` }),
     h('div', { class: 'b-actions b-sticky' }, go),
     h('section', { class: 'b-litter b-reveal' }, grid.element),
-    h('h3', { class: 'b-section-title', text: 'Your herd' }),
     herdSection('Your herd', me.herd),
   );
 }
@@ -427,7 +426,7 @@ function crossingScreen(r: Run): void {
     bar(r),
     routeStrip(r),
     h('h1', { text: `Stop ${r.stop}: a crossing` }),
-    h('p', { text: 'No rival herd here. The other expedition set out from the same six creatures you did, on this same route, and this is where the two of you meet.' }),
+    h('p', { text: `No rival herd here. The other expedition set out from the same ${DEAL} creatures you did, on this same route, and this is where the two of you meet.` }),
     h('p', { class: 'b-note', text: 'Creatures change sides between the two runs: what you win here, they lose, and what you lose here goes on with them.' }),
     h('div', { class: 'b-actions' }, button('Go to meet them', () => { crossingAck = r.stop; render(); }, { primary: true, id: 'to-lineup' })),
     h('div', { class: 'b-cols' },
@@ -502,7 +501,7 @@ function answerScreen(r: Run): void {
   const kids: Node[] = [
     bar(r),
     h('h2', { text: `Stop ${r.stop}: fight ${r.step + 1} of ${Math.min(brought.length, theirs.length)}` }),
-    h('p', { text: `${crossing ? 'The other expedition sends this one forward.' : 'This one steps out of the rival herd.'} Answer with one of the ${open.length === 1 ? 'one you have left' : `${open.length} you have left`}.` }),
+    h('p', { text: `${crossing ? 'The other expedition sends this one forward.' : 'This one steps out of the rival herd.'} Answer with ${open.length === 1 ? 'the one you have left' : `one of the ${open.length} you ${r.step === 0 ? 'brought' : 'have left'}`}.` }),
     h('div', { class: 'b-stepping' },
       h('div', {}, h('h3', { text: crossing ? 'Theirs, stepping up' : 'Stepping up' }), creatureCard(up.g, { size: 128, tag: tagOf(up) }).element)),
   ];
@@ -517,6 +516,14 @@ function answerScreen(r: Run): void {
 }
 
 // ---------------------------------------------------------------- the fight, and the capture
+/** The bar over a fight: the stop that fight was at, and the herd only once the result is out. */
+function fightBar(r: Run, f: ShownFight, withHerd: boolean): HTMLElement {
+  const kids: Node[] = [button('Menu', menu, { id: 'menu' }), h('span', { text: `Stop ${f.stop} of ${STOPS}` })];
+  if (withHerd) kids.push(h('span', { class: 'b-count', text: `Your herd ${r.exps[PLAYER].herd.length}` }));
+  kids.push(h('span', { class: 'b-soft', text: f.crossing ? 'a crossing' : 'a rival herd' }));
+  return h('div', { class: 'b-bar' }, ...kids);
+}
+
 function fightScreen(r: Run): void {
   const f: ShownFight = fightsOf(r)[seen];
   const rec = fightEvents(statsOf(f.mine.g), statsOf(f.theirs.g));
@@ -528,8 +535,9 @@ function fightScreen(r: Run): void {
   const mineName = `your ${label(f.mine.g)}`;
   const theirsName = `${f.crossing ? 'their' : 'the rival'} ${label(f.theirs.g)}`;
 
+  const top = fightBar(r, f, false);
   show('fight',
-    bar(r),
+    top,
     h('h2', { text: `Stop ${f.stop}: the fight` }),
     h('div', { class: 'b-fighters' },
       h('div', {}, h('h3', { text: 'Yours' }), creatureCard(f.mine.g, { size: 48, tag: tagOf(f.mine) }).element),
@@ -542,6 +550,7 @@ function fightScreen(r: Run): void {
   rp.finished.then(() => {
     if (mine !== epoch) return;
     document.body.dataset.fightDone = String(seen);
+    top.replaceWith(fightBar(r, f, true));
     const won = f.rec.result;
     const kids: Node[] = [h('p', { class: 'b-outcome', text: won > 0 ? 'You win the fight.' : won < 0 ? 'You lose the fight.' : 'A drawn fight. Nobody changes sides.' })];
     if (won !== 0) {
