@@ -150,6 +150,23 @@ jobs:
       - name: node --test tests/a-client.test.ts
         run: node --test tests/a-client.test.ts
 
+  # Variant B's tier 1 client session (web/b/session.ts, workshop #65): a stored
+  # run resumes to the same state, the same screen and the same fight list at
+  # every step, each fight is counted exactly once (the run engine re-points its
+  # live fight array rather than emptying it), and corrupt or edited storage is
+  # refused rather than thrown.
+  b-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/b-client.test.ts
+        run: node --test tests/b-client.test.ts
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
