@@ -86,6 +86,26 @@ jobs:
       - name: node --test tests/a-rules.test.ts
         run: node --test tests/a-rules.test.ts
 
+  # Variant B's run engine, rival generator and computer expedition (web/b/,
+  # workshop #63): limits and illegal moves, the same log gives the same hash at
+  # every prefix, a reload rerolls nothing, keep-one runs end. It also prints the
+  # PORT CHECK line -- the policy's finished share and mean end stop over 60
+  # seeds against the measured reference. The other gates this piece must pass
+  # already have jobs in this workflow and run on the same triggers: `typecheck`
+  # (tsc --noEmit, tsc -p tsconfig.web.json, build:web), `core-purity` and
+  # `determinism` (golden hashes under V8 and JavaScriptCore).
+  b-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: node --test tests/b-run.test.ts
+        run: node --test tests/b-run.test.ts
+
   # The replay's fight events (ui/fight-events.ts, workshop #60) copy core's
   # strike split outside core/. This keeps the copy equal to core.fight() bit
   # for bit over 9000 random fights.
